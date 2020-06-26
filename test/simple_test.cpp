@@ -21,6 +21,8 @@
 
 #include <iostream>
 
+#include <rmf_planner_viz/draw/Capsule.hpp>
+
 int main()
 {
   sf::RenderWindow app_window(
@@ -59,17 +61,50 @@ int main()
       }
     }
 
-    sf::Vertex line[] =
-    {
-      sf::Vector2f(10.f, 10.f),
-      sf::Vector2f(150.f, 150.f)
-    };
-
     window->Update(0.f);
     app_window.clear();
 
-    app_window.draw(line, 2, sf::Lines);
-    sfgui.Display(app_window);
+
+//    std::vector<sf::Vertex> lines =
+//    {
+//      {sf::Vector2f(10.f, 10.f), sf::Color::Green},
+//      {sf::Vector2f(150.f, 150.f), sf::Color::Yellow},
+//      sf::Vector2f(150.f, 200.f),
+//      sf::Vector2f(200.f, 200.f)
+//    };
+//    app_window.draw(lines.data(), lines.size(), sf::Lines);
+
+    sf::VertexArray rectangle(sf::Triangles, 6);
+    // define the position of the triangle's points
+    rectangle[0].position = sf::Vector2f(10.f, 10.f);
+    rectangle[1].position = sf::Vector2f(500.f, 10.f);
+    rectangle[2].position = sf::Vector2f(500.f, 100.f);
+
+    // define the color of the triangle's points
+    rectangle[0].color = sf::Color::Yellow;
+    rectangle[1].color = sf::Color::Green;
+    rectangle[2].color = sf::Color::Green;
+
+    // define the position of the triangle's points
+    rectangle[3].position = sf::Vector2f(10.f, 10.f);
+    rectangle[4].position = sf::Vector2f(10.f, 100.f);
+    rectangle[5].position = sf::Vector2f(500.f, 100.f);
+
+    // define the color of the triangle's points
+    rectangle[3].color = sf::Color::Yellow;
+    rectangle[4].color = sf::Color::Yellow;
+    rectangle[5].color = sf::Color::Green;
+
+    app_window.draw(rectangle);
+
+
+    app_window.draw(
+          rmf_planner_viz::draw::Capsule(
+            {sf::Vector2f(50.0, 300.0), sf::Color::Yellow},
+            {sf::Vector2f(500.0, 500.0), sf::Color::Green},
+            20.0));
+
+//    sfgui.Display(app_window);
     app_window.display();
   }
 }

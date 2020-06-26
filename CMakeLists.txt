@@ -17,10 +17,31 @@ find_package(SFGUI)
 
 include(GNUInstallDirs)
 
+add_library(
+  rmf_planning_viz
+    src/rmf_planner_viz/draw/Graph.cpp
+    src/rmf_planner_viz/draw/Capsule.cpp
+)
+
+target_link_libraries(
+  rmf_planning_viz
+  PUBLIC
+    rmf_traffic::rmf_traffic
+    sfml-graphics
+    SFGUI::SFGUI
+)
+
+target_include_directories(
+  rmf_planning_viz
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+)
+
 add_executable(simple_test test/simple_test.cpp)
+
 target_link_libraries(
   simple_test
   PUBLIC
-    sfml-graphics
-    SFGUI::SFGUI
+    rmf_planning_viz
 )
