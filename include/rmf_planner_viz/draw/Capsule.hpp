@@ -37,6 +37,13 @@ public:
       float radius,
       std::size_t resolution = 15);
 
+  /// Returns true if the coordinates of (x, y) are touching this capsule
+  bool pick(float x, float y) const;
+
+  Capsule& set_start_color(const sf::Color& color);
+
+  Capsule& set_end_color(const sf::Color& color);
+
   class Implementation;
 protected:
   void draw(sf::RenderTarget& target, sf::RenderStates states) const final;

@@ -24,6 +24,8 @@
 #include <SFML/Graphics/Shape.hpp>
 #include <SFML/Graphics/Vertex.hpp>
 
+#include <rmf_utils/optional.hpp>
+
 namespace rmf_planner_viz {
 namespace draw {
 
@@ -32,7 +34,32 @@ class Graph : public sf::Drawable
 {
 public:
 
-  Graph(const rmf_traffic::agv::Graph& graph);
+  Graph(const rmf_traffic::agv::Graph& graph, float lane_width);
+
+  bool choose_map(const std::string& name);
+
+  const std::string* current_map() const;
+
+  enum class ElementType
+  {
+    Waypoint,
+    Lane
+  };
+
+  struct Pick
+  {
+    ElementType type;
+    std::size_t index;
+  };
+
+  rmf_utils::optional<Pick> pick(
+      float x, float y, sf::Vector2u view_size) const;
+
+  void select(Pick chosen);
+
+  void deselect();
+
+  rmf_utils::optional<Pick> selected() const;
 
 protected:
 
