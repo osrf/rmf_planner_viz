@@ -34,17 +34,16 @@ int main()
   graph.add_waypoint(test_map_name, {-5.0, 0.0}); // 4
   graph.add_waypoint(test_map_name, {0.0, 0.0}); // 5
   graph.add_waypoint(test_map_name, {5.0, 0.0}); // 6
-//  graph.add_waypoint(test_map_name, {10.0, 0.0}); // 7
-  graph.add_waypoint(test_map_name, {2.5, 2.5}); // 7
+  graph.add_waypoint(test_map_name, {10.0, 0.0}); // 7
   graph.add_waypoint(test_map_name, {0.0, 5.0}); // 8
   graph.add_waypoint(test_map_name, {5.0, 5.0}).set_holding_point(true); // 9
   graph.add_waypoint(test_map_name, {0.0, 10.0}); // 10
   graph.add_waypoint(test_map_name, {5.0, 10.0}); // 11
 
   /*
-   *                  10------11
+   *                  10----->11
    *                   |      |
-   *                   |      |
+   *                   |      v
    *                   8------9
    *                   |      |
    *                   |      |
@@ -79,7 +78,9 @@ int main()
   graph.add_lane(11, 9);
 
   rmf_planner_viz::draw::Graph graph_drawable(graph, 1.0);
-
+  graph_drawable
+      .top_border(200)
+      .left_border(200);
 
   sf::RenderWindow app_window(
         sf::VideoMode(1250, 1028),

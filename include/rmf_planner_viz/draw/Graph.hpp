@@ -40,6 +40,14 @@ public:
 
   const std::string* current_map() const;
 
+  Graph& left_border(unsigned int p);
+
+  Graph& right_border(unsigned int p);
+
+  Graph& top_border(unsigned int p);
+
+  Graph& bottom_border(unsigned int p);
+
   enum class ElementType
   {
     Waypoint,

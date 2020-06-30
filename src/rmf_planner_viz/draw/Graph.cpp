@@ -68,6 +68,9 @@ public:
   Eigen::Vector2f min =  inf();
   Eigen::Vector2f max = -inf();
 
+  sf::Vector2u left_top_border;
+  sf::Vector2u right_bottom_border;
+
   rmf_utils::optional<Pick> selected;
 
   Implementation(
@@ -173,18 +176,26 @@ public:
       const sf::Vector2u view_size,
       sf::Transform& transform) const
   {
-    const auto dt = view_size;
+    const auto dt = view_size - left_top_border - right_bottom_border;
     const float full_scale = std::min(
           static_cast<float>(dt.x)/(max.x() - min.x()),
           static_cast<float>(dt.y)/(max.y() - min.y()));
 
     const float margin = 0.05;
+    const float m = 1.0 - 0.05;
     const float scale = (1.0 - 2.0 * margin) * full_scale;
+
+    const float left = left_top_border.x;
+    const float top = left_top_border.y;
+    const float right = right_bottom_border.x;
+    const float bottom = right_bottom_border.y;
+    const float vx = view_size.x;
+    const float vy = view_size.y;
 
     const Eigen::Vector2f center_g = 0.5 * (max + min);
     const Eigen::Vector2f center_r(
-          static_cast<float>(dt.x)/2.0f,
-          static_cast<float>(dt.y)/2.0f);
+          (vx - m*right + m*left)/2.0f,
+          (vy - m*bottom + m*top)/2.0f);
 
     const Eigen::Vector2f dx = center_r - full_scale*center_g;
 
@@ -297,6 +308,34 @@ const std::string* Graph::current_map() const
     return &_pimpl->current_map.value();
 
   return nullptr;
+}
+
+//==============================================================================
+Graph& Graph::left_border(unsigned int p)
+{
+  _pimpl->left_top_border.x = p;
+  return *this;
+}
+
+//==============================================================================
+Graph& Graph::right_border(unsigned int p)
+{
+  _pimpl->right_bottom_border.x = p;
+  return *this;
+}
+
+//==============================================================================
+Graph& Graph::top_border(unsigned int p)
+{
+  _pimpl->left_top_border.y = p;
+  return *this;
+}
+
+//==============================================================================
+Graph& Graph::bottom_border(unsigned int p)
+{
+  _pimpl->right_bottom_border.y = p;
+  return *this;
 }
 
 //==============================================================================
