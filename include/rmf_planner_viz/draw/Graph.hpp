@@ -26,6 +26,8 @@
 
 #include <rmf_utils/optional.hpp>
 
+#include <rmf_planner_viz/draw/Fit.hpp>
+
 namespace rmf_planner_viz {
 namespace draw {
 
@@ -40,13 +42,9 @@ public:
 
   const std::string* current_map() const;
 
-  Graph& left_border(unsigned int p);
-
-  Graph& right_border(unsigned int p);
-
-  Graph& top_border(unsigned int p);
-
-  Graph& bottom_border(unsigned int p);
+  /// Get the scaling factor for this graph that will allow it to fit into the
+  /// given view size
+  const Fit::Bounds& bounds() const;
 
   enum class ElementType
   {
@@ -61,7 +59,8 @@ public:
   };
 
   rmf_utils::optional<Pick> pick(
-      float x, float y, sf::Vector2u view_size) const;
+      float x, float y,
+      const sf::Transform& transform) const;
 
   void select(Pick chosen);
 

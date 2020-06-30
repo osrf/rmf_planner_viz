@@ -39,9 +39,10 @@ int main()
   graph.add_waypoint(test_map_name, {5.0, 5.0}).set_holding_point(true); // 9
   graph.add_waypoint(test_map_name, {0.0, 10.0}); // 10
   graph.add_waypoint(test_map_name, {5.0, 10.0}); // 11
+  graph.add_waypoint(test_map_name, {-12.0, 10.0}); // 12
 
   /*
-   *                  10----->11
+   *  12------------->10----->11
    *                   |      |
    *                   |      v
    *                   8------9
@@ -76,11 +77,10 @@ int main()
   add_bidir_lane(8, 10);
   graph.add_lane(10, 11);
   graph.add_lane(11, 9);
+  graph.add_lane(12, 10);
 
   rmf_planner_viz::draw::Graph graph_drawable(graph, 1.0);
-  graph_drawable
-      .top_border(200)
-      .left_border(200);
+  rmf_planner_viz::draw::Fit fit({graph_drawable.bounds()}, 0.1);
 
   sf::RenderWindow app_window(
         sf::VideoMode(1250, 1028),
@@ -100,7 +100,7 @@ int main()
   button->GetSignal(sfg::Widget::OnLeftClick).Connect(
         [&button]()
   {
-    button->SetLabel("I was clicked");
+    button->SetLabel(" --------- I was clicked --------- ");
   });
 
   window->Add(box);
@@ -128,7 +128,7 @@ int main()
         const auto pick = graph_drawable.pick(
               event.mouseMove.x,
               event.mouseMove.y,
-              app_window.getSize());
+              fit.compute_transform(app_window.getSize()));
       }
 
       if (event.type == sf::Event::MouseButtonPressed)
@@ -136,18 +136,24 @@ int main()
         const auto pick = graph_drawable.pick(
               event.mouseButton.x,
               event.mouseButton.y,
-              app_window.getSize());
+              fit.compute_transform(app_window.getSize()));
 
         if (pick)
           graph_drawable.select(*pick);
       }
     }
 
+    const auto& rect = window->GetAllocation();
+    fit.left_border(rect.left + rect.width);
+
     window->Update(0.f);
     app_window.clear();
 
-    app_window.draw(graph_drawable);
+    sf::RenderStates states;
+    fit.apply_transform(states.transform, app_window.getSize());
+    app_window.draw(graph_drawable, states);
 
+    sfgui.Display(app_window);
     app_window.display();
   }
 }

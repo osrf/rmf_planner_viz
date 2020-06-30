@@ -65,9 +65,9 @@ public:
   float lane_width;
   std::unordered_map<std::string, MapData> data;
   rmf_utils::optional<std::string> current_map;
-  Eigen::Vector2f min =  inf();
-  Eigen::Vector2f max = -inf();
+  Fit::Bounds bounds;
 
+  float scale;
   sf::Vector2u left_top_border;
   sf::Vector2u right_bottom_border;
 
@@ -118,11 +118,11 @@ public:
       {
         for (std::size_t i=0; i < 2; ++i)
         {
-          if (p[i] < min[i])
-            min[i] = p[i];
+          if (p[i] < bounds.min[i])
+            bounds.min[i] = p[i];
 
-          if (max[i] < p[i])
-            max[i] = p[i];
+          if (bounds.max[i] < p[i])
+            bounds.max[i] = p[i];
         }
       }
 
@@ -170,38 +170,9 @@ public:
         map_data.waypoint_indices.push_back(j1);
       }
     }
-  }
 
-  void apply_transform(
-      const sf::Vector2u view_size,
-      sf::Transform& transform) const
-  {
-    const auto dt = view_size - left_top_border - right_bottom_border;
-    const float full_scale = std::min(
-          static_cast<float>(dt.x)/(max.x() - min.x()),
-          static_cast<float>(dt.y)/(max.y() - min.y()));
-
-    const float margin = 0.05;
-    const float m = 1.0 - 0.05;
-    const float scale = (1.0 - 2.0 * margin) * full_scale;
-
-    const float left = left_top_border.x;
-    const float top = left_top_border.y;
-    const float right = right_bottom_border.x;
-    const float bottom = right_bottom_border.y;
-    const float vx = view_size.x;
-    const float vy = view_size.y;
-
-    const Eigen::Vector2f center_g = 0.5 * (max + min);
-    const Eigen::Vector2f center_r(
-          (vx - m*right + m*left)/2.0f,
-          (vy - m*bottom + m*top)/2.0f);
-
-    const Eigen::Vector2f dx = center_r - full_scale*center_g;
-
-    transform
-        .translate(dx[0], dx[1])
-        .scale(scale, -scale);
+    bounds.min -= Eigen::Vector2f::Constant(lane_width/2.0);
+    bounds.max += Eigen::Vector2f::Constant(lane_width/2.0);
   }
 
   void highlight(const Pick chosen)
@@ -311,58 +282,35 @@ const std::string* Graph::current_map() const
 }
 
 //==============================================================================
-Graph& Graph::left_border(unsigned int p)
+const Fit::Bounds& Graph::bounds() const
 {
-  _pimpl->left_top_border.x = p;
-  return *this;
-}
-
-//==============================================================================
-Graph& Graph::right_border(unsigned int p)
-{
-  _pimpl->right_bottom_border.x = p;
-  return *this;
-}
-
-//==============================================================================
-Graph& Graph::top_border(unsigned int p)
-{
-  _pimpl->left_top_border.y = p;
-  return *this;
-}
-
-//==============================================================================
-Graph& Graph::bottom_border(unsigned int p)
-{
-  _pimpl->right_bottom_border.y = p;
-  return *this;
+  return _pimpl->bounds;
 }
 
 //==============================================================================
 rmf_utils::optional<Graph::Pick> Graph::pick(
-    float x, float y, sf::Vector2u view_size) const
+    float x, float y,
+    const sf::Transform& transform) const
 {
   if (!_pimpl->current_map)
     return rmf_utils::nullopt;
 
-  sf::Transform tf;
-  _pimpl->apply_transform(view_size, tf);
-  const sf::Transform inv_tf = tf.getInverse();
+  const sf::Transform inv_tf = transform.getInverse();
   const sf::Vector2f sf_p_l = inv_tf * sf::Vector2f(x, y);
   const Eigen::Vector2f p_l(sf_p_l.x, sf_p_l.y);
 
   const float r_wp = _pimpl->waypoint_radius();
 
-  if (p_l.x() < _pimpl->min.x() - r_wp)
+  if (p_l.x() < _pimpl->bounds.min.x() - r_wp)
     return rmf_utils::nullopt;
 
-  if (p_l.y() < _pimpl->min.y() - r_wp)
+  if (p_l.y() < _pimpl->bounds.min.y() - r_wp)
     return rmf_utils::nullopt;
 
-  if (_pimpl->max.x() + r_wp < p_l.x())
+  if (_pimpl->bounds.max.x() + r_wp < p_l.x())
     return rmf_utils::nullopt;
 
-  if (_pimpl->max.y() + r_wp < p_l.y())
+  if (_pimpl->bounds.max.y() + r_wp < p_l.y())
     return rmf_utils::nullopt;
 
   const auto& map_data = _pimpl->data.at(*_pimpl->current_map);
@@ -433,8 +381,6 @@ rmf_utils::optional<Graph::Pick> Graph::selected() const
 //==============================================================================
 void Graph::draw(sf::RenderTarget& target, sf::RenderStates states) const
 {
-  _pimpl->apply_transform(target.getSize(), states.transform);
-
   if (!_pimpl->current_map)
     return;
 

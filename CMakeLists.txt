@@ -19,6 +19,7 @@ include(GNUInstallDirs)
 
 add_library(
   rmf_planning_viz
+    src/rmf_planner_viz/draw/Fit.cpp
     src/rmf_planner_viz/draw/Graph.cpp
     src/rmf_planner_viz/draw/Capsule.cpp
 )
