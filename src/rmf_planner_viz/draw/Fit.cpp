@@ -97,7 +97,9 @@ void Fit::apply_transform(
   const float vx = render_size.x;
   const float vy = render_size.y;
 
-  const Eigen::Vector2f center_g = 0.5 * (_bounds.max + _bounds.min);
+  Eigen::Vector2f center_g = 0.5 * (_bounds.max + _bounds.min);
+  center_g[1] = -center_g[1];
+
   const Eigen::Vector2f center_r(
         (vx - (right+m) + (left+m))/2.0f,
         (vy - (bottom+m) + (top+m))/2.0f);

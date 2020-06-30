@@ -26,29 +26,31 @@
 int main()
 {
   const std::string test_map_name = "test_map";
-  rmf_traffic::agv::Graph graph;
-  graph.add_waypoint(test_map_name, {0.0, -10.0}); // 0
-  graph.add_waypoint(test_map_name, {0.0, -5.0});  // 1
-  graph.add_waypoint(test_map_name, {5.0, -5.0}).set_holding_point(true);  // 2
-  graph.add_waypoint(test_map_name, {-10.0, 0.0}); // 3
-  graph.add_waypoint(test_map_name, {-5.0, 0.0}); // 4
-  graph.add_waypoint(test_map_name, {0.0, 0.0}); // 5
-  graph.add_waypoint(test_map_name, {5.0, 0.0}); // 6
-  graph.add_waypoint(test_map_name, {10.0, 0.0}); // 7
-  graph.add_waypoint(test_map_name, {0.0, 5.0}); // 8
-  graph.add_waypoint(test_map_name, {5.0, 5.0}).set_holding_point(true); // 9
-  graph.add_waypoint(test_map_name, {0.0, 10.0}); // 10
-  graph.add_waypoint(test_map_name, {5.0, 10.0}); // 11
-  graph.add_waypoint(test_map_name, {-12.0, 10.0}); // 12
+  rmf_traffic::agv::Graph graph_0;
+  graph_0.add_waypoint(test_map_name, {0.0, -10.0}); // 0
+  graph_0.add_waypoint(test_map_name, {0.0, -5.0});  // 1
+  graph_0.add_waypoint(test_map_name, {5.0, -5.0}).set_holding_point(true);  // 2
+  graph_0.add_waypoint(test_map_name, {-10.0, 0.0}); // 3
+  graph_0.add_waypoint(test_map_name, {-5.0, 0.0}); // 4
+  graph_0.add_waypoint(test_map_name, {0.0, 0.0}); // 5
+  graph_0.add_waypoint(test_map_name, {5.0, 0.0}); // 6
+  graph_0.add_waypoint(test_map_name, {10.0, 0.0}); // 7
+  graph_0.add_waypoint(test_map_name, {0.0, 5.0}); // 8
+  graph_0.add_waypoint(test_map_name, {5.0, 5.0}).set_holding_point(true); // 9
+  graph_0.add_waypoint(test_map_name, {0.0, 10.0}); // 10
+  graph_0.add_waypoint(test_map_name, {5.0, 10.0}); // 11
+  graph_0.add_waypoint(test_map_name, {-12.0, 10.0}); // 12
 
-  /*
-   *  12------------->10----->11
-   *                   |      |
-   *                   |      v
-   *                   8------9
-   *                   |      |
-   *                   |      |
-   *     3------4------5------6------7
+  /*            0<------------1<------------2
+   *                                        ^
+   *                                        |
+   *  12------------->10----->11            |
+   *                   |      |             |
+   *                   |      v             |
+   *                   8------9             |
+   *                   |      |             |
+   *                   |      |             |
+   *     3------4------5------6------7      3
    *                   |      |
    *                   |      |
    *                   1------2
@@ -59,8 +61,8 @@ int main()
 
   auto add_bidir_lane = [&](const std::size_t w0, const std::size_t w1)
     {
-      graph.add_lane(w0, w1);
-      graph.add_lane(w1, w0);
+      graph_0.add_lane(w0, w1);
+      graph_0.add_lane(w1, w0);
     };
 
   add_bidir_lane(0, 1);
@@ -75,12 +77,25 @@ int main()
   add_bidir_lane(6, 9);
   add_bidir_lane(8, 9);
   add_bidir_lane(8, 10);
-  graph.add_lane(10, 11);
-  graph.add_lane(11, 9);
-  graph.add_lane(12, 10);
+  graph_0.add_lane(10, 11);
+  graph_0.add_lane(11, 9);
+  graph_0.add_lane(12, 10);
 
-  rmf_planner_viz::draw::Graph graph_drawable(graph, 1.0);
-  rmf_planner_viz::draw::Fit fit({graph_drawable.bounds()}, 0.1);
+  rmf_planner_viz::draw::Graph graph_0_drawable(graph_0, 1.0);
+
+  rmf_traffic::agv::Graph graph_1;
+  graph_1.add_waypoint(test_map_name, {-5.0, 15.0}); // 0
+  graph_1.add_waypoint(test_map_name, { 5.0, 15.0}); // 1
+  graph_1.add_waypoint(test_map_name, {15.0, 15.0}); // 2
+  graph_1.add_waypoint(test_map_name, {15.0,  0.0}); // 3
+  graph_1.add_lane(1, 0);
+  graph_1.add_lane(2, 1);
+  graph_1.add_lane(3, 2);
+
+  rmf_planner_viz::draw::Graph graph_1_drawable(graph_1, 0.5);
+
+  rmf_planner_viz::draw::Fit fit(
+    {graph_0_drawable.bounds(), graph_1_drawable.bounds()}, 0.02);
 
   sf::RenderWindow app_window(
         sf::VideoMode(1250, 1028),
@@ -125,7 +140,7 @@ int main()
 
       if (event.type == sf::Event::MouseMoved)
       {
-        const auto pick = graph_drawable.pick(
+        const auto pick = graph_0_drawable.pick(
               event.mouseMove.x,
               event.mouseMove.y,
               fit.compute_transform(app_window.getSize()));
@@ -133,13 +148,13 @@ int main()
 
       if (event.type == sf::Event::MouseButtonPressed)
       {
-        const auto pick = graph_drawable.pick(
+        const auto pick = graph_0_drawable.pick(
               event.mouseButton.x,
               event.mouseButton.y,
               fit.compute_transform(app_window.getSize()));
 
         if (pick)
-          graph_drawable.select(*pick);
+          graph_0_drawable.select(*pick);
       }
     }
 
@@ -151,7 +166,8 @@ int main()
 
     sf::RenderStates states;
     fit.apply_transform(states.transform, app_window.getSize());
-    app_window.draw(graph_drawable, states);
+    app_window.draw(graph_0_drawable, states);
+    app_window.draw(graph_1_drawable, states);
 
     sfgui.Display(app_window);
     app_window.display();
