@@ -138,21 +138,13 @@ int main()
         app_window.setView(sf::View(visibleArea));
       }
 
-      if (event.type == sf::Event::MouseMoved)
-      {
-        const auto pick = graph_0_drawable.pick(
-              event.mouseMove.x,
-              event.mouseMove.y,
-              fit.compute_transform(app_window.getSize()));
-      }
-
       if (event.type == sf::Event::MouseButtonPressed)
       {
-        const auto pick = graph_0_drawable.pick(
-              event.mouseButton.x,
-              event.mouseButton.y,
-              fit.compute_transform(app_window.getSize()));
+        const sf::Vector2f p =
+            fit.compute_transform(app_window.getSize()).getInverse()
+            * sf::Vector2f(event.mouseButton.x, event.mouseButton.y);
 
+        const auto pick = graph_0_drawable.pick(p.x, p.y);
         if (pick)
           graph_0_drawable.select(*pick);
       }

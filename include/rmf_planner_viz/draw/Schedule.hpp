@@ -15,56 +15,53 @@
  *
 */
 
-#ifndef RMF_PLANNER_VIZ__DRAW__GRAPH_HPP
-#define RMF_PLANNER_VIZ__DRAW__GRAPH_HPP
+#ifndef RMF_PLANNER_VIZ__DRAW__SCHEDULE_HPP
+#define RMF_PLANNER_VIZ__DRAW__SCHEDULE_HPP
 
-#include <rmf_traffic/agv/Graph.hpp>
-
-#include <SFML/Graphics/Drawable.hpp>
-#include <SFML/Graphics/Shape.hpp>
-#include <SFML/Graphics/Vertex.hpp>
-
-#include <rmf_utils/optional.hpp>
+#include <rmf_traffic/schedule/Viewer.hpp>
+#include <rmf_traffic/schedule/Writer.hpp>
 
 #include <rmf_planner_viz/draw/Fit.hpp>
+
+#include <SFML/Graphics/Drawable.hpp>
 
 namespace rmf_planner_viz {
 namespace draw {
 
 //==============================================================================
-class Graph : public sf::Drawable
+class Schedule : public sf::Drawable
 {
 public:
 
-  Graph(const rmf_traffic::agv::Graph& graph, float lane_width);
+  Schedule(
+      std::shared_ptr<rmf_traffic::schedule::Viewer> viewer,
+      rmf_traffic::schedule::Query::Participants participants,
+      std::string map,
+      rmf_traffic::Time start_time,
+      rmf_utils::optional<rmf_traffic::Duration> duration,
+      float width);
 
-  bool choose_map(const std::string& name);
+  void participants(
+      const rmf_traffic::schedule::Query::Participants& participants);
 
-  const std::string* current_map() const;
+  void choose_map(const std::string& name);
 
-  /// Get the scaling factor for this graph that will allow it to fit into the
-  /// given view size
+  const std::string& current_map() const;
+
+  void timespan(
+      rmf_traffic::Time start,
+      rmf_utils::optional<rmf_traffic::Duration> duration);
+
   const Fit::Bounds& bounds() const;
-
-  enum class ElementType
-  {
-    Waypoint,
-    Lane
-  };
 
   struct Pick
   {
-    ElementType type;
-    std::size_t index;
+    rmf_traffic::schedule::ParticipantId participant;
+    rmf_traffic::RouteId route;
   };
 
   rmf_utils::optional<Pick> pick(float x, float y) const;
 
-  void select(Pick chosen);
-
-  void deselect();
-
-  rmf_utils::optional<Pick> selected() const;
 
 protected:
 
@@ -78,4 +75,4 @@ private:
 } // namespace draw
 } // namespace rmf_planner_viz
 
-#endif // RMF_PLANNER_VIZ__DRAW__GRAPH_HPP
+#endif // RMF_PLANNER_VIZ__DRAW__SCHEDULE_HPP

@@ -15,56 +15,34 @@
  *
 */
 
-#ifndef RMF_PLANNER_VIZ__DRAW__GRAPH_HPP
-#define RMF_PLANNER_VIZ__DRAW__GRAPH_HPP
+#ifndef RMF_PLANNER_VIZ__DRAW__TRAJECTORY_HPP
+#define RMF_PLANNER_VIZ__DRAW__TRAJECTORY_HPP
 
-#include <rmf_traffic/agv/Graph.hpp>
+#include <rmf_traffic/Trajectory.hpp>
 
 #include <SFML/Graphics/Drawable.hpp>
-#include <SFML/Graphics/Shape.hpp>
-#include <SFML/Graphics/Vertex.hpp>
-
-#include <rmf_utils/optional.hpp>
 
 #include <rmf_planner_viz/draw/Fit.hpp>
+
+#include <rmf_utils/optional.hpp>
 
 namespace rmf_planner_viz {
 namespace draw {
 
 //==============================================================================
-class Graph : public sf::Drawable
+class Trajectory : public sf::Drawable
 {
 public:
 
-  Graph(const rmf_traffic::agv::Graph& graph, float lane_width);
+  Trajectory(
+      const rmf_traffic::Trajectory& trajectory,
+      rmf_traffic::Time start,
+      rmf_utils::optional<rmf_traffic::Duration> duration,
+      float width);
 
-  bool choose_map(const std::string& name);
-
-  const std::string* current_map() const;
-
-  /// Get the scaling factor for this graph that will allow it to fit into the
-  /// given view size
   const Fit::Bounds& bounds() const;
 
-  enum class ElementType
-  {
-    Waypoint,
-    Lane
-  };
-
-  struct Pick
-  {
-    ElementType type;
-    std::size_t index;
-  };
-
-  rmf_utils::optional<Pick> pick(float x, float y) const;
-
-  void select(Pick chosen);
-
-  void deselect();
-
-  rmf_utils::optional<Pick> selected() const;
+  bool pick(float x, float y) const;
 
 protected:
 
@@ -78,4 +56,5 @@ private:
 } // namespace draw
 } // namespace rmf_planner_viz
 
-#endif // RMF_PLANNER_VIZ__DRAW__GRAPH_HPP
+
+#endif // RMF_PLANNER_VIZ__DRAW__TRAJECTORY_HPP

@@ -288,16 +288,12 @@ const Fit::Bounds& Graph::bounds() const
 }
 
 //==============================================================================
-rmf_utils::optional<Graph::Pick> Graph::pick(
-    float x, float y,
-    const sf::Transform& transform) const
+rmf_utils::optional<Graph::Pick> Graph::pick(float x, float y) const
 {
   if (!_pimpl->current_map)
     return rmf_utils::nullopt;
 
-  const sf::Transform inv_tf = transform.getInverse();
-  const sf::Vector2f sf_p_l = inv_tf * sf::Vector2f(x, y);
-  const Eigen::Vector2f p_l(sf_p_l.x, sf_p_l.y);
+  const Eigen::Vector2f p_l(x, y);
 
   const float r_wp = _pimpl->waypoint_radius();
 
