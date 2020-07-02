@@ -21,6 +21,7 @@
 #include <rmf_traffic/Motion.hpp>
 
 #include <SFML/Graphics/RenderTarget.hpp>
+#include <SFML/Graphics/CircleShape.hpp>
 
 namespace rmf_planner_viz {
 namespace draw {
@@ -30,6 +31,7 @@ class Trajectory::Implementation
 {
 public:
 
+  sf::CircleShape vehicle;
   std::vector<Capsule> capsules;
   float radius;
   Fit::Bounds bounds;
@@ -48,10 +50,13 @@ public:
 
     const auto begin_it = trajectory.lower_bound(start);
 
+    if (begin_it == trajectory.end())
+      return;
+
     const auto interpolate_it = [&]()
     {
       if (start < begin_it->time() && begin_it != trajectory.begin())
-        --rmf_traffic::Trajectory::const_iterator(begin_it);
+        return --rmf_traffic::Trajectory::const_iterator(begin_it);
 
       return begin_it;
     }();
@@ -62,23 +67,45 @@ public:
     if (interpolate_it == end_it)
       return;
 
-    const auto motion =
-        rmf_traffic::Motion::compute_cubic_splines(interpolate_it, end_it);
-
-    const Eigen::Vector2d p_interp =
-        motion->compute_position(start).block<2,1>(0,0) + offset;
-    const Eigen::Vector2d p_begin =
-        begin_it->position().block<2,1>(0,0) + offset;
-
     capsules.reserve(trajectory.size());
-    capsules.push_back(
-          Capsule(
-            {sf::Vector2f(p_interp.x(), p_interp.y()), color},
-            {sf::Vector2f(p_begin.x(), p_begin.y()), color},
-            radius));
 
-    bounds.add_point(p_interp.block<2,1>(0,0).cast<float>(), radius);
-    bounds.add_point(p_begin.block<2,1>(0,0).cast<float>(), radius);
+    Eigen::Vector3d p;
+    if (interpolate_it != begin_it)
+    {
+      const auto motion =
+          rmf_traffic::Motion::compute_cubic_splines(
+            interpolate_it,
+            ++rmf_traffic::Trajectory::const_iterator(begin_it));
+
+      p = motion->compute_position(start);
+      const Eigen::Vector2d p_interp = p.block<2,1>(0,0) + offset;
+      const Eigen::Vector2d p_begin =
+          begin_it->position().block<2,1>(0,0) + offset;
+
+      capsules.push_back(
+            Capsule(
+              {sf::Vector2f(p_interp.x(), p_interp.y()), color},
+              {sf::Vector2f(p_begin.x(), p_begin.y()), color},
+              radius));
+
+      bounds.add_point(p_interp.block<2,1>(0,0).cast<float>(), radius);
+      bounds.add_point(p_begin.block<2,1>(0,0).cast<float>(), radius);
+    }
+    else
+    {
+      p = begin_it->position();
+    }
+
+    const auto R = 5*radius;
+    vehicle.setRadius(R);
+    vehicle.setPointCount(3);
+    vehicle.setFillColor(color);
+    vehicle.setOrigin(R, R);
+    vehicle.setPosition(p[0], p[1]);
+    vehicle.rotate(-30.0);
+    vehicle.rotate(p[2]*180.0/M_PI);
+    vehicle.setOutlineColor(sf::Color::Black);
+    vehicle.setOutlineThickness(radius/3.0);
 
     auto it_next = ++rmf_traffic::Trajectory::const_iterator(begin_it);
     for (auto it = begin_it; it_next != trajectory.end(); ++it, ++it_next)
@@ -136,6 +163,8 @@ void Trajectory::draw(sf::RenderTarget& target, sf::RenderStates states) const
 {
   for (const auto& capsule : _pimpl->capsules)
     target.draw(capsule, states);
+
+  target.draw(_pimpl->vehicle, states);
 }
 
 } // namespace draw

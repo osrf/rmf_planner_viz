@@ -147,7 +147,6 @@ Schedule::Schedule(
   // Do nothing
 }
 
-
 //==============================================================================
 Schedule& Schedule::participants(
     const rmf_traffic::schedule::Query::Participants& participants)
@@ -204,9 +203,7 @@ rmf_utils::optional<Schedule::Pick> Schedule::pick(float x, float y) const
   for (const auto& t : _pimpl->data)
   {
     if (t.trajectory.pick(x, y))
-    {
       return Pick{t.participant, t.route_id};
-    }
   }
 
   return rmf_utils::nullopt;

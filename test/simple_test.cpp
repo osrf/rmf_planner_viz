@@ -205,6 +205,8 @@ int main()
     window->Update(0.f);
     app_window.clear();
 
+    schedule_drawable.timespan(std::chrono::steady_clock::now());
+
     sf::RenderStates states;
     fit.apply_transform(states.transform, app_window.getSize());
     app_window.draw(graph_0_drawable, states);

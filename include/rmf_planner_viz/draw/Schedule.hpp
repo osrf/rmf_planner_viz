@@ -51,7 +51,7 @@ public:
 
   Schedule& timespan(
       rmf_traffic::Time start,
-      rmf_utils::optional<rmf_traffic::Duration> duration);
+      rmf_utils::optional<rmf_traffic::Duration> duration = rmf_utils::nullopt);
 
   const Fit::Bounds& bounds() const;
 
