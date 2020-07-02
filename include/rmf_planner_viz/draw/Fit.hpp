@@ -37,11 +37,24 @@ public:
   {
     Eigen::Vector2f min;
     Eigen::Vector2f max;
+
+    Bounds();
+
+    Bounds(Eigen::Vector2f min, Eigen::Vector2f max);
+
+    Bounds& add_point(Eigen::Vector2f p, float radius=0.0f);
+    Bounds& add_bounds(const Bounds& other);
+    Bounds& reset();
+
+    bool inside(Eigen::Vector2f p) const;
   };
 
   Fit(const std::vector<Bounds>& all_bounds, float margin = 0.02);
 
   Fit& add_bounds(const Bounds& new_bounds);
+
+  /// Clear out all the bounds that have been given to this Fit.
+  Fit& reset();
 
   Fit& left_border(unsigned int p);
 

@@ -22,9 +22,25 @@
 #include <iostream>
 
 #include <rmf_planner_viz/draw/Graph.hpp>
+#include <rmf_planner_viz/draw/Schedule.hpp>
+
+#include <rmf_traffic/schedule/Database.hpp>
+#include <rmf_traffic/agv/Planner.hpp>
+#include <rmf_traffic/geometry/Circle.hpp>
 
 int main()
 {
+  const rmf_traffic::Profile profile{
+    rmf_traffic::geometry::make_final_convex<
+      rmf_traffic::geometry::Circle>(1.0)
+  };
+
+  const rmf_traffic::agv::VehicleTraits traits{
+    {0.7, 0.3},
+    {1.0, 0.45},
+    profile
+  };
+
   const std::string test_map_name = "test_map";
   rmf_traffic::agv::Graph graph_0;
   graph_0.add_waypoint(test_map_name, {0.0, -10.0}); // 0
@@ -94,6 +110,39 @@ int main()
 
   rmf_planner_viz::draw::Graph graph_1_drawable(graph_1, 0.5);
 
+  std::shared_ptr<rmf_traffic::schedule::Database> database =
+      std::make_shared<rmf_traffic::schedule::Database>();
+
+  rmf_traffic::agv::Planner planner_0(
+        rmf_traffic::agv::Planner::Configuration(graph_0, traits),
+        rmf_traffic::agv::Planner::Options(nullptr));
+
+  auto p0 = rmf_traffic::schedule::make_participant(
+        rmf_traffic::schedule::ParticipantDescription{
+          "participant_0",
+          "simple_test",
+          rmf_traffic::schedule::ParticipantDescription::Rx::Responsive,
+          profile
+        },
+        database);
+
+  const auto now = std::chrono::steady_clock::now();
+  p0.set(planner_0.plan({now, 12, 0.0}, 7)->get_itinerary());
+
+  auto p1 = rmf_traffic::schedule::make_participant(
+        rmf_traffic::schedule::ParticipantDescription{
+          "participant_1",
+          "simple_test",
+          rmf_traffic::schedule::ParticipantDescription::Rx::Responsive,
+          profile
+        },
+        database);
+
+  p1.set(planner_0.plan({now, 11, 0.0}, 3)->get_itinerary());
+
+  rmf_planner_viz::draw::Schedule schedule_drawable(
+        database, 0.25, test_map_name, now);
+
   rmf_planner_viz::draw::Fit fit(
     {graph_0_drawable.bounds(), graph_1_drawable.bounds()}, 0.02);
 
@@ -160,6 +209,7 @@ int main()
     fit.apply_transform(states.transform, app_window.getSize());
     app_window.draw(graph_0_drawable, states);
     app_window.draw(graph_1_drawable, states);
+    app_window.draw(schedule_drawable, states);
 
     sfgui.Display(app_window);
     app_window.display();

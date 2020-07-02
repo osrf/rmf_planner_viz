@@ -26,6 +26,76 @@ const float inf = std::numeric_limits<float>::infinity();
 } // anonymous namespace
 
 //==============================================================================
+Fit::Bounds::Bounds()
+  : min(inf, inf),
+    max(-inf, -inf)
+{
+  // Do nothing
+}
+
+//==============================================================================
+Fit::Bounds::Bounds(
+    Eigen::Vector2f min_,
+    Eigen::Vector2f max_)
+  : min(min_),
+    max(max_)
+{
+  // Do nothing
+}
+
+//==============================================================================
+Fit::Bounds& Fit::Bounds::add_point(Eigen::Vector2f p, float radius)
+{
+  for (int i=0; i < 2; ++i)
+  {
+    if (p[i] - radius < min[i])
+      min[i] = p[i] - radius;
+
+    if (max[i] < p[i] + radius)
+      max[i] = p[i] + radius;
+  }
+
+  return *this;
+}
+
+//==============================================================================
+Fit::Bounds& Fit::Bounds::add_bounds(const Bounds& other)
+{
+  for (int i=0; i < 2; ++i)
+  {
+    if (other.min[i] < min[i])
+      min[i] = other.min[i];
+
+    if (max[i] < other.max[i])
+      max[i] = other.max[i];
+  }
+
+  return *this;
+}
+
+//==============================================================================
+Fit::Bounds& Fit::Bounds::reset()
+{
+  *this = Fit::Bounds();
+  return *this;
+}
+
+//==============================================================================
+bool Fit::Bounds::inside(Eigen::Vector2f p) const
+{
+  for (int i=0; i < 2; ++i)
+  {
+    if (p[i] < min[i])
+      return false;
+
+    if (max[i] < p[i])
+      return false;
+  }
+
+  return true;
+}
+
+//==============================================================================
 Fit::Fit(const std::vector<Bounds>& all_bounds, float margin)
   : _margin(margin),
     _bounds{{inf, inf}, {-inf, -inf}}
@@ -37,15 +107,14 @@ Fit::Fit(const std::vector<Bounds>& all_bounds, float margin)
 //==============================================================================
 Fit& Fit::add_bounds(const Bounds& new_bounds)
 {
-  for (int i=0; i < 2; ++i)
-  {
-    if (new_bounds.min[i] < _bounds.min[i])
-      _bounds.min[i] = new_bounds.min[i];
+  _bounds.add_bounds(new_bounds);
+  return *this;
+}
 
-    if (_bounds.max[i] < new_bounds.max[i])
-      _bounds.max[i] = new_bounds.max[i];
-  }
-
+//==============================================================================
+Fit& Fit::reset()
+{
+  _bounds.reset();
   return *this;
 }
 

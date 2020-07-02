@@ -35,20 +35,21 @@ public:
 
   Schedule(
       std::shared_ptr<rmf_traffic::schedule::Viewer> viewer,
-      rmf_traffic::schedule::Query::Participants participants,
+      float width,
       std::string map,
       rmf_traffic::Time start_time,
-      rmf_utils::optional<rmf_traffic::Duration> duration,
-      float width);
+      rmf_utils::optional<rmf_traffic::Duration> duration = rmf_utils::nullopt,
+      rmf_traffic::schedule::Query::Participants participants =
+          rmf_traffic::schedule::Query::Participants::make_all());
 
-  void participants(
+  Schedule& participants(
       const rmf_traffic::schedule::Query::Participants& participants);
 
-  void choose_map(const std::string& name);
+  Schedule& choose_map(const std::string& name);
 
   const std::string& current_map() const;
 
-  void timespan(
+  Schedule& timespan(
       rmf_traffic::Time start,
       rmf_utils::optional<rmf_traffic::Duration> duration);
 
@@ -57,7 +58,7 @@ public:
   struct Pick
   {
     rmf_traffic::schedule::ParticipantId participant;
-    rmf_traffic::RouteId route;
+    rmf_traffic::RouteId route_id;
   };
 
   rmf_utils::optional<Pick> pick(float x, float y) const;

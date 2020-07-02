@@ -21,6 +21,7 @@
 #include <rmf_traffic/Trajectory.hpp>
 
 #include <SFML/Graphics/Drawable.hpp>
+#include <SFML/Graphics/Color.hpp>
 
 #include <rmf_planner_viz/draw/Fit.hpp>
 
@@ -38,6 +39,8 @@ public:
       const rmf_traffic::Trajectory& trajectory,
       rmf_traffic::Time start,
       rmf_utils::optional<rmf_traffic::Duration> duration,
+      sf::Color color,
+      Eigen::Vector2d offset,
       float width);
 
   const Fit::Bounds& bounds() const;
