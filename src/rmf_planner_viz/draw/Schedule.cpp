@@ -17,8 +17,11 @@
 
 #include <rmf_planner_viz/draw/Schedule.hpp>
 #include <rmf_planner_viz/draw/Trajectory.hpp>
+#include <rmf_planner_viz/draw/ColorPicker.hpp>
 
 #include <SFML/Graphics/RenderTarget.hpp>
+
+#include <iostream>
 
 namespace rmf_planner_viz {
 namespace draw {
@@ -67,9 +70,9 @@ public:
     }
   }
 
-  sf::Color compute_color(rmf_traffic::schedule::ParticipantId) const
+  sf::Color compute_color(rmf_traffic::schedule::ParticipantId id) const
   {
-    return sf::Color::Magenta;
+    return ColorPicker::choose(id);
   }
 
   Eigen::Vector2d compute_offset(rmf_traffic::schedule::ParticipantId id) const
@@ -78,9 +81,9 @@ public:
       return Eigen::Vector2d::Zero();
 
     if (id % 2 == 0)
-      return Eigen::Vector2d::Constant(-id/2 * width);
+      return Eigen::Vector2d::Constant(-static_cast<float>(id/2) * width);
 
-    return Eigen::Vector2d::Constant((id+1)/2 * width);
+    return Eigen::Vector2d::Constant(static_cast<float>((id+1)/2) * width);
   }
 
   void prepare() const
@@ -114,6 +117,7 @@ public:
               v.route_id,
               Trajectory(
                 v.route.trajectory(),
+                v.description.profile(),
                 start_time,
                 duration,
                 compute_color(v.participant),

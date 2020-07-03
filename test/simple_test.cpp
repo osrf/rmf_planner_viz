@@ -127,7 +127,7 @@ int main()
         database);
 
   const auto now = std::chrono::steady_clock::now();
-  p0.set(planner_0.plan({now, 12, 0.0}, 7)->get_itinerary());
+  p0.set(planner_0.plan({now, 11, 0.0}, 3)->get_itinerary());
 
   auto p1 = rmf_traffic::schedule::make_participant(
         rmf_traffic::schedule::ParticipantDescription{
@@ -138,7 +138,49 @@ int main()
         },
         database);
 
-  p1.set(planner_0.plan({now, 11, 0.0}, 3)->get_itinerary());
+  p1.set(planner_0.plan({now, 12, 0.0}, 2)->get_itinerary());
+
+  auto pa = rmf_traffic::schedule::make_participant(
+        rmf_traffic::schedule::ParticipantDescription{
+          "participant_0",
+          "simple_test",
+          rmf_traffic::schedule::ParticipantDescription::Rx::Responsive,
+          profile
+        },
+        database);
+
+  auto pb = rmf_traffic::schedule::make_participant(
+        rmf_traffic::schedule::ParticipantDescription{
+          "participant_0",
+          "simple_test",
+          rmf_traffic::schedule::ParticipantDescription::Rx::Responsive,
+          profile
+        },
+        database);
+
+//  auto pc = rmf_traffic::schedule::make_participant(
+//        rmf_traffic::schedule::ParticipantDescription{
+//          "participant_0",
+//          "simple_test",
+//          rmf_traffic::schedule::ParticipantDescription::Rx::Responsive,
+//          profile
+//        },
+//        database);
+
+  auto p2 = rmf_traffic::schedule::make_participant(
+        rmf_traffic::schedule::ParticipantDescription{
+          "participant_2",
+          "simple_test",
+          rmf_traffic::schedule::ParticipantDescription::Rx::Responsive,
+          profile
+        },
+        database);
+
+  p2.set(planner_0.plan(
+    {now, 10, 0.0}, 7,
+    rmf_traffic::agv::Plan::Options(
+    rmf_traffic::agv::ScheduleRouteValidator::make(
+        database, p2.id(), p2.description().profile())))->get_itinerary());
 
   rmf_planner_viz::draw::Schedule schedule_drawable(
         database, 0.25, test_map_name, now);

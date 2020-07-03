@@ -245,8 +245,8 @@ public:
   }
 };
 
-const sf::Color Graph::Implementation::LaneEntryColor = sf::Color::Green;
-const sf::Color Graph::Implementation::LaneExitColor = sf::Color::Red;
+const sf::Color Graph::Implementation::LaneEntryColor = sf::Color::White;
+const sf::Color Graph::Implementation::LaneExitColor = sf::Color(255/3, 255/3, 255/3);
 const sf::Color Graph::Implementation::WaypointColor = sf::Color::Blue;
 
 //==============================================================================

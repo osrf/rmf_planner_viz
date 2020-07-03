@@ -19,6 +19,7 @@
 #define RMF_PLANNER_VIZ__DRAW__TRAJECTORY_HPP
 
 #include <rmf_traffic/Trajectory.hpp>
+#include <rmf_traffic/Profile.hpp>
 
 #include <SFML/Graphics/Drawable.hpp>
 #include <SFML/Graphics/Color.hpp>
@@ -37,11 +38,12 @@ public:
 
   Trajectory(
       const rmf_traffic::Trajectory& trajectory,
+      const rmf_traffic::Profile& profile,
       rmf_traffic::Time start,
       rmf_utils::optional<rmf_traffic::Duration> duration,
       sf::Color color,
       Eigen::Vector2d offset,
-      float width);
+      float projection_width);
 
   const Fit::Bounds& bounds() const;
 

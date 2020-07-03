@@ -31,13 +31,56 @@ class Trajectory::Implementation
 {
 public:
 
-  sf::CircleShape vehicle;
+  sf::CircleShape arrow;
+  sf::CircleShape footprint;
+  sf::CircleShape vicinity;
   std::vector<Capsule> capsules;
   float radius;
   Fit::Bounds bounds;
 
+  void configure_circle(
+      sf::CircleShape& circle,
+      const Eigen::Vector3d& p,
+      float R,
+      const sf::Color& color,
+      std::size_t point_count = 30,
+      float s_x = 1.0)
+  {
+    circle.setRadius(R);
+    circle.setPointCount(point_count);
+    circle.setFillColor(color);
+    circle.setOrigin(R, R);
+    circle.setPosition(p[0], p[1]);
+    circle.scale(s_x, 1.0);
+    circle.rotate(90.0);
+    circle.rotate(p[2]*180.0/M_PI);
+    circle.setOutlineColor(sf::Color::Black);
+    circle.setOutlineThickness(radius/3.0);
+  }
+
+  void configure_arrow(
+      const Eigen::Vector3d& p,
+      float R,
+      const sf::Color& color)
+  {
+    configure_circle(arrow, p, R, color, 3, 0.7);
+  }
+
+  void configure_footprint(const Eigen::Vector3d& p, float R)
+  {
+    configure_circle(footprint, p, R, sf::Color::White);
+  }
+
+  void configure_vicinity(const Eigen::Vector3d& p, float R)
+  {
+    auto color = sf::Color::Yellow;
+    color.a = 255/5;
+    configure_circle(vicinity, p, R, color);
+  }
+
   Implementation(
       const rmf_traffic::Trajectory& trajectory,
+      const rmf_traffic::Profile& profile,
       rmf_traffic::Time start,
       rmf_utils::optional<rmf_traffic::Duration> duration,
       sf::Color color,
@@ -96,16 +139,10 @@ public:
       p = begin_it->position();
     }
 
-    const auto R = 5*radius;
-    vehicle.setRadius(R);
-    vehicle.setPointCount(3);
-    vehicle.setFillColor(color);
-    vehicle.setOrigin(R, R);
-    vehicle.setPosition(p[0], p[1]);
-    vehicle.rotate(-30.0);
-    vehicle.rotate(p[2]*180.0/M_PI);
-    vehicle.setOutlineColor(sf::Color::Black);
-    vehicle.setOutlineThickness(radius/3.0);
+    configure_arrow(p, profile.footprint()->get_characteristic_length(), color);
+    configure_footprint(p, profile.footprint()->get_characteristic_length());
+    configure_vicinity(p, profile.vicinity()->get_characteristic_length());
+
 
     auto it_next = ++rmf_traffic::Trajectory::const_iterator(begin_it);
     for (auto it = begin_it; it_next != trajectory.end(); ++it, ++it_next)
@@ -126,13 +163,14 @@ public:
 //==============================================================================
 Trajectory::Trajectory(
     const rmf_traffic::Trajectory& trajectory,
+    const rmf_traffic::Profile& profile,
     rmf_traffic::Time start,
     rmf_utils::optional<rmf_traffic::Duration> duration,
     sf::Color color,
     Eigen::Vector2d offset,
-    float width)
+    float projection_width)
   : _pimpl(rmf_utils::make_impl<Implementation>(
-             trajectory, start, duration, color, offset, width))
+      trajectory, profile, start, duration, color, offset, projection_width))
 {
   // Do nothing
 }
@@ -155,16 +193,19 @@ bool Trajectory::pick(float x, float y) const
       return true;
   }
 
+  // TODO(MXG): Add picking for the vehicle shape
   return false;
 }
 
 //==============================================================================
 void Trajectory::draw(sf::RenderTarget& target, sf::RenderStates states) const
 {
+  target.draw(_pimpl->vicinity, states);
   for (const auto& capsule : _pimpl->capsules)
     target.draw(capsule, states);
 
-  target.draw(_pimpl->vehicle, states);
+  target.draw(_pimpl->footprint, states);
+  target.draw(_pimpl->arrow, states);
 }
 
 } // namespace draw
