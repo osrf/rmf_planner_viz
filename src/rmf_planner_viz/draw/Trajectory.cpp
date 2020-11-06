@@ -78,19 +78,14 @@ public:
     configure_circle(vicinity, p, R, color);
   }
 
-  Implementation(
+  void efficient_straight_line_drawing(
       const rmf_traffic::Trajectory& trajectory,
       const rmf_traffic::Profile& profile,
-      rmf_traffic::Time start,
-      rmf_utils::optional<rmf_traffic::Duration> duration,
-      sf::Color color,
-      Eigen::Vector2d offset,
-      float width)
-    : radius(width/2.0)
+      const rmf_traffic::Time start,
+      std::optional<rmf_traffic::Duration> duration,
+      const sf::Color color,
+      const Eigen::Vector2d offset)
   {
-    if (trajectory.size() == 0)
-      return;
-
     const auto begin_it = trajectory.lower_bound(start);
 
     if (begin_it == trajectory.end())
@@ -157,6 +152,70 @@ public:
 
       bounds.add_point(pn.block<2,1>(0,0).cast<float>(), radius);
     }
+  }
+
+  void accurate_curve_drawing(
+      const rmf_traffic::Trajectory& trajectory,
+      const rmf_traffic::Profile& profile,
+      const rmf_traffic::Time start,
+      std::optional<rmf_traffic::Duration> duration,
+      const sf::Color color,
+      const Eigen::Vector2d offset)
+  {
+    const auto motion = rmf_traffic::Motion::compute_cubic_splines(trajectory);
+
+    const auto step = std::chrono::milliseconds(100);
+    const auto end = duration ?
+          start + duration.value() : motion->finish_time();
+    const auto begin = motion->start_time();
+
+    if (motion->start_time() <= start)
+    {
+      const Eigen::Vector3d p = motion->compute_position(start);
+      configure_arrow(p, profile.footprint()->get_characteristic_length(), color);
+      configure_footprint(p, profile.footprint()->get_characteristic_length());
+      configure_vicinity(p, profile.vicinity()->get_characteristic_length());
+    }
+
+    for (auto time=std::max(begin, start); time <= end; time += step)
+    {
+      const auto next_time = std::min(time + step, end);
+
+      const Eigen::Vector2d p =
+          motion->compute_position(time).block<2,1>(0, 0) + offset;
+      const Eigen::Vector2d pn =
+          motion->compute_position(next_time).block<2,1>(0, 0) + offset;
+
+      capsules.push_back(
+        Capsule(
+          {sf::Vector2f(p.x(), p.y()), color},
+          {sf::Vector2f(pn.x(), pn.y()), color},
+          radius));
+
+      bounds.add_point(p.block<2,1>(0,0).cast<float>(), radius);
+      bounds.add_point(pn.block<2,1>(0,0).cast<float>(), radius);
+    }
+  }
+
+  Implementation(
+      const rmf_traffic::Trajectory& trajectory,
+      const rmf_traffic::Profile& profile,
+      rmf_traffic::Time start,
+      rmf_utils::optional<rmf_traffic::Duration> duration,
+      sf::Color color,
+      Eigen::Vector2d offset,
+      float width)
+    : radius(width/2.0)
+  {
+    if (trajectory.size() == 0)
+      return;
+
+    // This is very efficient but only works for straight-line trajectories
+//    efficient_straight_line_drawing(
+//          trajectory, profile, start, duration, color, offset);
+
+    accurate_curve_drawing(
+          trajectory, profile, start, duration, color, offset);
   }
 };
 

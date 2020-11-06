@@ -43,9 +43,15 @@ target_include_directories(
 )
 
 add_executable(simple_test test/simple_test.cpp)
-
 target_link_libraries(
   simple_test
+  PUBLIC
+    rmf_planning_viz
+)
+
+add_executable(test_trajectory test/test_trajectory.cpp)
+target_link_libraries(
+  test_trajectory
   PUBLIC
     rmf_planning_viz
 )

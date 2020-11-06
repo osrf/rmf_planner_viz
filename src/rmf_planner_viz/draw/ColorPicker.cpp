@@ -44,7 +44,7 @@ sf::Color ColorPicker::choose(std::size_t index)
     return Primary * (t1 - t0)/60.0;
   };
 
-  std::cout << index << " --> " << theta << " | " << theta_r << std::endl;
+//  std::cout << index << " --> " << theta << " | " << theta_r << std::endl;
 
   sf::Color color;
   if (-60.0 <= theta_r && theta_r <= 60.0)
