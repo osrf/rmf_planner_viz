@@ -34,7 +34,6 @@ target_link_libraries(
   PUBLIC
     rmf_traffic::rmf_traffic
     sfml-graphics
-    SFGUI::SFGUI
 )
 
 target_include_directories(
@@ -49,6 +48,7 @@ target_link_libraries(
   simple_test
   PUBLIC
     rmf_planning_viz
+    ImGui-SFML::ImGui-SFML
 )
 
 add_executable(test_trajectory test/test_trajectory.cpp)
@@ -56,6 +56,7 @@ target_link_libraries(
   test_trajectory
   PUBLIC
     rmf_planning_viz
+    ImGui-SFML::ImGui-SFML
 )
 
 add_executable(test_spline 

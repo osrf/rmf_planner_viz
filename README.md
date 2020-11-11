@@ -6,7 +6,6 @@ To build:
 2. Clone https://github.com/osrf/rmf_core
 3. Clone https://github.com/osrf/rmf_planner_viz
 4. Clone https://github.com/SFML/SFML
-5. Clone https://github.com/TankOs/SFGUI
 6. Clone https://github.com/ocornut/imgui.git
 7. Clone https://github.com/eliasdaler/imgui-sfml.git
 8. go into your imgui directory and do `touch COLCON_IGNORE`

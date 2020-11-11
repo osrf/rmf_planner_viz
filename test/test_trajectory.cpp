@@ -16,8 +16,7 @@
 */
 
 #include <SFML/Graphics.hpp>
-#include <SFGUI/SFGUI.hpp>
-#include <SFGUI/Widgets.hpp>
+#include <imgui.h>
 
 #include <rmf_planner_viz/draw/Schedule.hpp>
 
@@ -25,6 +24,10 @@
 #include <rmf_traffic/geometry/Circle.hpp>
 
 #include <Eigen/Geometry>
+
+#include <iostream>
+
+#include "imgui-SFML.h"
 
 int main()
 {
@@ -91,10 +94,7 @@ int main()
         sf::Style::Default);
 
   app_window.resetGLStates();
-
-  sfg::SFGUI sfgui;
-  auto window = sfg::Window::Create();
-
+  
   const auto bounds = schedule_drawable.bounds();
 
   rmf_planner_viz::draw::Fit fit({bounds}, 0.02);
@@ -102,12 +102,13 @@ int main()
             << " -- min: " << bounds.min.transpose()
             << "\n -- max: " << bounds.max.transpose() << std::endl;
 
+  sf::Clock deltaClock;
   while (app_window.isOpen())
   {
     sf::Event event;
     while (app_window.pollEvent(event))
     {
-      window->HandleEvent(event);
+      ImGui::SFML::ProcessEvent(event);
 
       if (event.type == sf::Event::Closed)
       {
@@ -121,10 +122,8 @@ int main()
       }
     }
 
-    const auto& rect = window->GetAllocation();
-    fit.left_border(rect.left + rect.width);
+    ImGui::SFML::Update(app_window, deltaClock.restart());
 
-    window->Update(0.f);
     app_window.clear();
 
     schedule_drawable.timespan(std::chrono::steady_clock::now());
@@ -133,7 +132,7 @@ int main()
     fit.apply_transform(states.transform, app_window.getSize());
     app_window.draw(schedule_drawable, states);
 
-    sfgui.Display(app_window);
+
     app_window.display();
   }
 }

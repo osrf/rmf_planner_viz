@@ -75,7 +75,6 @@ int main()
     sf::Event event;
     while (app_window.pollEvent(event))
     {
-      //window->HandleEvent(event);
       ImGui::SFML::ProcessEvent(event);
 
       if (event.type == sf::Event::Closed)
@@ -102,7 +101,6 @@ int main()
     static double red_spline_t_val = 0.0;
     ImGui::InputDouble("Red Spline Time-value", &red_spline_t_val, 0.1);
     ImGui::Separator();
-    
     
     using namespace std::chrono_literals;
     using namespace rmf_planner_viz::draw;
