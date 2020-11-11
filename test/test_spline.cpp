@@ -34,9 +34,9 @@
 
 std::vector<sf::VertexArray> g_vertexarrays;
 
-void DrawAxis()
+void draw_axis()
 {
-  // x-axis
+  // x-axis + arrowhead
   {
     sf::VertexArray arr(sf::Lines);
     sf::Vertex v;
@@ -48,9 +48,20 @@ void DrawAxis()
     v.position = sf::Vector2f(1, 0);
     arr.append(v);
 
+    float cap_x = 0.85f;
+    v.position = sf::Vector2f(1, 0);
+    arr.append(v);
+    v.position = sf::Vector2f(cap_x, 0.15f);
+    arr.append(v);
+
+    v.position = sf::Vector2f(1, 0);
+    arr.append(v);
+    v.position = sf::Vector2f(cap_x, -0.15f);
+    arr.append(v);
+
     g_vertexarrays.push_back(arr);
   }
-  // y-axis
+  // y-axis + arrowhead
   {
     sf::VertexArray arr(sf::Lines);
     sf::Vertex v;
@@ -62,11 +73,21 @@ void DrawAxis()
     v.position = sf::Vector2f(0, 1);
     arr.append(v);
 
+    float cap_y = 0.85f;
+    v.position = sf::Vector2f(0, 1);
+    arr.append(v);
+    v.position = sf::Vector2f(0.15f, cap_y);
+    arr.append(v);
+
+    v.position = sf::Vector2f(0, 1);
+    arr.append(v);
+    v.position = sf::Vector2f(-0.15f, cap_y);
+    arr.append(v);
     g_vertexarrays.push_back(arr);
   }
 }
 
-void DrawCircle(const sf::Vector2f& center, double radius, const sf::Color& color, uint slices = 16)
+void draw_circle(const sf::Vector2f& center, double radius, const sf::Color& color, uint slices = 16)
 {
   sf::VertexArray arr(sf::Lines);
 
@@ -87,7 +108,7 @@ void DrawCircle(const sf::Vector2f& center, double radius, const sf::Color& colo
   g_vertexarrays.push_back(arr);
 }
 
-void DrawTrajectory(const rmf_traffic::Trajectory& trajectory, const sf::Color& color = sf::Color(255, 255, 255, 255))
+void draw_trajectory(const rmf_traffic::Trajectory& trajectory, const sf::Color& color = sf::Color(255, 255, 255, 255))
 {
   //lifted from Trajectory::Implementation::accurate_curve_drawing
 
@@ -128,6 +149,14 @@ void DrawTrajectory(const rmf_traffic::Trajectory& trajectory, const sf::Color& 
   }
 
   g_vertexarrays.push_back(vtx_arr);
+}
+
+sf::Vector2f sample_trajectory(const rmf_traffic::Trajectory& trajectory, rmf_traffic::Time time)
+{
+  const auto motion = rmf_traffic::Motion::compute_cubic_splines(trajectory);
+  const Eigen::Vector2d p =
+      motion->compute_position(time).block<2,1>(0, 0);
+  return sf::Vector2f(p.x(), p.y());
 }
 
 int main()
@@ -195,24 +224,26 @@ int main()
     ImGui::InputDouble("Red Spline Time duration", &duration, 0.1);
     
     static double red_spline_t_val = 0.0;
-    ImGui::InputDouble("Red Spline T-value", &red_spline_t_val, 0.1);
+    //ImGui::InputDouble("Red Spline T-value", &red_spline_t_val, 0.1);
     ImGui::InputDouble("Red Spline Time-value", &red_spline_t_val, 0.1);
     ImGui::Separator();
     
-    {
-      using namespace std::chrono_literals;
-      auto now = std::chrono::steady_clock::now();
 
+    using namespace std::chrono_literals;
+    auto now = std::chrono::steady_clock::now();
+    rmf_traffic::Trajectory t1;
+    rmf_traffic::Trajectory t2;
+
+    {
       auto duration_chrono = rmf_traffic::time::from_seconds(duration);
       auto end = now + duration_chrono;
 
       Eigen::Vector3d pos = Eigen::Vector3d(0, 0, 0);
       Eigen::Vector3d vel = Eigen::Vector3d(0, 0, 0);
-      rmf_traffic::Trajectory t1;
+      
       t1.insert(now, pos, vel);
       t1.insert(end, pos, vel);
-
-      rmf_traffic::Trajectory t2;
+      
       t2.insert(now, Eigen::Vector3d(-2, 2, 0), Eigen::Vector3d(0, -2, 0));
       t2.insert(end, Eigen::Vector3d(2, 2, 0), Eigen::Vector3d(0, 2, 0));
 
@@ -223,14 +254,21 @@ int main()
       else
         ImGui::Text("Not collided!");
 
-      DrawTrajectory(t1, sf::Color::Green);
-      DrawTrajectory(t2, sf::Color::Red);
+      draw_trajectory(t1, sf::Color::Green);
+      draw_trajectory(t2, sf::Color::Red);
     }
     ImGui::End();
     ImGui::EndFrame();
 
-    DrawCircle(sf::Vector2f(0, 0), circle_shape->get_characteristic_length(), sf::Color::Green);
-    DrawAxis();
+    // draw robot shapes
+    {
+      draw_circle(sf::Vector2f(0, 0), circle_shape->get_characteristic_length(), sf::Color::Green);
+
+      sf::Vector2f pt = sample_trajectory(t2, now + rmf_traffic::time::from_seconds(red_spline_t_val));
+      draw_circle(pt, circle_shape->get_characteristic_length(), sf::Color::Red);
+    }
+    
+    draw_axis();
     
     app_window.clear();
     app_window.setView(view);
