@@ -14,6 +14,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rmf_traffic REQUIRED)
 find_package(SFML COMPONENTS graphics window system REQUIRED)
 find_package(SFGUI)
+find_package(ImGui-SFML)
 
 include(GNUInstallDirs)
 
@@ -54,4 +55,15 @@ target_link_libraries(
   test_trajectory
   PUBLIC
     rmf_planning_viz
+)
+
+add_executable(test_spline 
+  test/test_spline.cpp
+  )
+
+target_link_libraries(
+  test_spline
+  PUBLIC
+    rmf_planning_viz
+    ImGui-SFML::ImGui-SFML
 )
