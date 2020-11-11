@@ -18,13 +18,22 @@
 #include <rmf_planner_viz/draw/IMDraw.hpp>
 #include <rmf_traffic/Motion.hpp>
 
+#include <iostream>
+
 namespace rmf_planner_viz {
 namespace draw {
 
 static std::vector<sf::VertexArray> g_vertexarrays; //internal use only
+static const int VERTEX_ARRAYS_LIMIT = 16 * 1024;
 
 void IMDraw::draw_circle(const sf::Vector2f& center, double radius, const sf::Color& color, uint slices)
 {
+  if (g_vertexarrays.size() >= VERTEX_ARRAYS_LIMIT)
+  {
+    std::cout << "Vertex array limit exceeded" << std::endl;
+    return;
+  }
+
   sf::VertexArray arr(sf::Lines);
 
   double rotation_per_slice = (2.0 * M_PI) / (double)slices;
@@ -47,6 +56,12 @@ void IMDraw::draw_circle(const sf::Vector2f& center, double radius, const sf::Co
 
 void IMDraw::draw_axis()
 {
+  if (g_vertexarrays.size() >= VERTEX_ARRAYS_LIMIT)
+  {
+    std::cout << "Vertex array limit exceeded" << std::endl;
+    return;
+  }
+
   // x-axis + arrowhead
   {
     sf::VertexArray arr(sf::Lines);
@@ -100,6 +115,11 @@ void IMDraw::draw_axis()
 
 void IMDraw::draw_trajectory(const rmf_traffic::Trajectory& trajectory, const sf::Color& color)
 {
+  if (g_vertexarrays.size() >= VERTEX_ARRAYS_LIMIT)
+  {
+    std::cout << "Vertex array limit exceeded" << std::endl;
+    return;
+  }
   //lifted from Trajectory::Implementation::accurate_curve_drawing
 
   const auto motion = rmf_traffic::Motion::compute_cubic_splines(trajectory);
