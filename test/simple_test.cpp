@@ -16,17 +16,19 @@
 */
 
 #include <SFML/Graphics.hpp>
-#include <SFGUI/SFGUI.hpp>
-#include <SFGUI/Widgets.hpp>
+#include <imgui.h>
 
 #include <iostream>
 
 #include <rmf_planner_viz/draw/Graph.hpp>
 #include <rmf_planner_viz/draw/Schedule.hpp>
+#include <rmf_planner_viz/draw/IMDraw.hpp>
 
 #include <rmf_traffic/schedule/Database.hpp>
 #include <rmf_traffic/agv/Planner.hpp>
 #include <rmf_traffic/geometry/Circle.hpp>
+
+#include "imgui-SFML.h"
 
 int main()
 {
@@ -195,28 +197,15 @@ int main()
 
   app_window.resetGLStates();
 
-  sfg::SFGUI sfgui;
-  auto window = sfg::Window::Create();
+  ImGui::SFML::Init(app_window);
 
-  auto box = sfg::Box::Create(sfg::Box::Orientation::VERTICAL, 5.f);
-
-  auto button = sfg::Button::Create("Click me");
-  box->Pack(button);
-
-  button->GetSignal(sfg::Widget::OnLeftClick).Connect(
-        [&button]()
-  {
-    button->SetLabel(" --------- I was clicked --------- ");
-  });
-
-  window->Add(box);
-
+  sf::Clock deltaClock;
   while (app_window.isOpen())
   {
     sf::Event event;
     while (app_window.pollEvent(event))
     {
-      window->HandleEvent(event);
+      ImGui::SFML::ProcessEvent(event);
 
       if (event.type == sf::Event::Closed)
       {
@@ -241,10 +230,22 @@ int main()
       }
     }
 
-    const auto& rect = window->GetAllocation();
-    fit.left_border(rect.left + rect.width);
+    ImGui::SFML::Update(app_window, deltaClock.restart());
 
-    window->Update(0.f);
+    static bool demo_control = true;
+    static float demo_color[4] = { 1.f, 1.f, 1.f, 1.f};
+    ImGui::SetWindowSize(ImVec2(600, 200));
+    
+    ImGui::Begin("Demo control panel", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+    ImGui::TextColored(ImVec4(0, 1, 0, 1), "Demo control panel");
+    ImGui::Checkbox("demo_control", &demo_control);
+    ImGui::ColorPicker4("colorpicker", demo_color);
+    ImGui::End();
+    
+
+    ImGui::EndFrame();
+
+    /*** drawing ***/
     app_window.clear();
 
     schedule_drawable.timespan(std::chrono::steady_clock::now());
@@ -255,7 +256,14 @@ int main()
     app_window.draw(graph_1_drawable, states);
     app_window.draw(schedule_drawable, states);
 
-    sfgui.Display(app_window);
+    {
+      sf::Transformable vqs;
+      vqs.setScale(1.f, -1.f);
+      auto tx_flipped_2d = vqs.getTransform();
+      rmf_planner_viz::draw::IMDraw::flush_and_render(app_window, tx_flipped_2d);
+    }
+
+    ImGui::SFML::Render(app_window);
     app_window.display();
   }
 }

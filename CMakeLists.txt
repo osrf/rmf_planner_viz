@@ -14,6 +14,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rmf_traffic REQUIRED)
 find_package(SFML COMPONENTS graphics window system REQUIRED)
 find_package(SFGUI)
+find_package(ImGui-SFML)
 
 include(GNUInstallDirs)
 
@@ -25,6 +26,7 @@ add_library(
     src/rmf_planner_viz/draw/Capsule.cpp
     src/rmf_planner_viz/draw/Schedule.cpp
     src/rmf_planner_viz/draw/Trajectory.cpp
+    src/rmf_planner_viz/draw/IMDraw.cpp
 )
 
 target_link_libraries(
@@ -32,7 +34,6 @@ target_link_libraries(
   PUBLIC
     rmf_traffic::rmf_traffic
     sfml-graphics
-    SFGUI::SFGUI
 )
 
 target_include_directories(
@@ -47,6 +48,7 @@ target_link_libraries(
   simple_test
   PUBLIC
     rmf_planning_viz
+    ImGui-SFML::ImGui-SFML
 )
 
 add_executable(test_trajectory test/test_trajectory.cpp)
@@ -54,4 +56,16 @@ target_link_libraries(
   test_trajectory
   PUBLIC
     rmf_planning_viz
+    ImGui-SFML::ImGui-SFML
+)
+
+add_executable(test_spline 
+  test/test_spline.cpp
+  )
+
+target_link_libraries(
+  test_spline
+  PUBLIC
+    rmf_planning_viz
+    ImGui-SFML::ImGui-SFML
 )
