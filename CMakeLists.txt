@@ -26,6 +26,7 @@ add_library(
     src/rmf_planner_viz/draw/Capsule.cpp
     src/rmf_planner_viz/draw/Schedule.cpp
     src/rmf_planner_viz/draw/Trajectory.cpp
+    src/rmf_planner_viz/draw/IMDraw.cpp
 )
 
 target_link_libraries(
