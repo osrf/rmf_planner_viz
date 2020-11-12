@@ -26,7 +26,7 @@
 namespace rmf_planner_viz {
 namespace draw {
 
-/// Series of immediate-mode drawing functions
+/// Series of immediate-mode drawing functions. Note that this is done for iteration times and quick access, and may not be profile
 class IMDraw
 {
 public:
@@ -42,7 +42,9 @@ public:
     const rmf_traffic::Trajectory& trajectory,
     const sf::Color& color = sf::Color(255, 255, 255, 255));
 
+  static void draw_line(const sf::Vector2f& start, const sf::Vector2f& end, const sf::Color& color = sf::Color(255, 255, 255, 255));
 
+  static void draw_arrow(const sf::Vector2f& start, const sf::Vector2f& end, const sf::Color& color = sf::Color(255, 255, 255, 255));
   // render all objects and flush the internal vertex array buffer
   static void flush_and_render(sf::RenderWindow& app_window, const sf::Transform& tx_flipped_2d);
 };

@@ -69,3 +69,25 @@ target_link_libraries(
     rmf_planning_viz
     ImGui-SFML::ImGui-SFML
 )
+
+######## FCL test ##########
+
+find_package(fcl 0.6 QUIET)
+if(fcl_FOUND)
+  set(FCL_LIBRARIES fcl)
+  message(STATUS "Using FCL version: ${FCL_VERSION}")
+
+  add_executable(test_fcl_spline 
+    test/test_fcl_spline.cpp
+  )
+
+  target_link_libraries(
+    test_fcl_spline
+    PUBLIC
+      rmf_planning_viz
+      ImGui-SFML::ImGui-SFML
+      fcl
+  )
+  
+endif()
+
