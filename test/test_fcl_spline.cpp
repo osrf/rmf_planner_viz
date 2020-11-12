@@ -81,7 +81,7 @@ int main()
   app_window.resetGLStates();
 
   //view centered at origin, with width/height
-  sf::View view(sf::Vector2f(0.f, 0.f), sf::Vector2f(10.f, 10.f));
+  sf::View view(sf::Vector2f(0.f, 0.f), sf::Vector2f(20.f, 20.f));
   app_window.setView(view);
 
   sf::Transformable vqs;
@@ -96,10 +96,12 @@ int main()
   memset(r, 0, sizeof(r));
 
   //some defaults
-  t[0][0] = -5.0; t[0][1] = -3.0;
-  t[1][0] = -2.0; t[1][1] = 1.0;
-  t[2][0] = 2.0; t[2][1] = 1.0;
-  t[3][0] = 5.0; t[3][1] = -3.0;
+  t[0][0] = 7.5; t[0][1] = 8;
+  t[1][0] = 4.2; t[1][1] = 8;
+  t[2][0] = 0.8; t[2][1] = 8;
+  t[3][0] = -2.5; t[3][1] = 8;
+
+  r[0][2] = r[1][2] = r[2][2] = r[3][2] = M_PI;
 
   sf::Clock deltaClock;
   while (app_window.isOpen())
@@ -127,8 +129,6 @@ int main()
     using namespace std::chrono_literals;
     using namespace rmf_planner_viz::draw;
 
-    auto now = std::chrono::steady_clock::now();
-    
     {
       ImGui::InputFloat3("T0", t[0]);
       ImGui::InputFloat3("T1", t[1]);
@@ -153,7 +153,20 @@ int main()
       fcl::Vector3d r3 { r[3][0], r[3][1], r[3][2] };
 
       fcl::SplineMotion<double> motion(t0, t1, t2, t3, r0, r1, r2, r3);
-      draw_fcl_splinemotion(motion, sf::Color(0, 255, 0, 255));
+      draw_fcl_splinemotion(motion, sf::Color(255, 255, 255, 255));
+
+      t0 = fcl::Vector3d(0.0, 8.0, 0.0);
+      t1 = fcl::Vector3d(1.25, 8.0, 0.0);
+      t2 = fcl::Vector3d(3.0, 8.0, 0.0);
+      t3 = fcl::Vector3d(4.6, 8.0, 0.0);
+
+      r0 = fcl::Vector3d(0.0, 0.0, 0.0);
+      r1 = fcl::Vector3d(0.0, 0.0, 0.0);
+      r2 = fcl::Vector3d(0.0, 0.0, 0.0);
+      r3 = fcl::Vector3d(0.0, 0.0, 0.0);
+      
+      fcl::SplineMotion<double> motion2(t0, t1, t2, t3, r0, r1, r2, r3);
+      draw_fcl_splinemotion(motion2, sf::Color(255, 255, 0, 255));
 
       // draw robot circle on motion
       static float interp = 0.0f;
@@ -167,7 +180,7 @@ int main()
       auto linear = tf.linear();
 
       auto column1 = linear.block<1, 3>(0,0);
-      ImGui::Text("forward %f %f %f", column1.x(), column1.y());
+      ImGui::Text("forward: %f %f", column1.x(), column1.y());
       //auto column2 = linear.block<1, 3>(1,0);
       auto pt_end = fcl::Vector3d(pt.x() + column1.x(), pt.y() + column1.y(), 0.0);
       IMDraw::draw_arrow(sf::Vector2f(pt.x(), pt.y()), sf::Vector2f(pt_end.x(), pt_end.y()), sf::Color::Green);
