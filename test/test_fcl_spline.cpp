@@ -48,7 +48,6 @@ void draw_fcl_splinemotion(const fcl::SplineMotion<double>& motion, const sf::Co
     motion.integrate(interp);
     motion.getCurrentTransform(tf);
 
-    tf.linear();
     auto translate1 = tf.translation();    
     motion.integrate(interp_next);
 
@@ -179,7 +178,8 @@ int main()
       IMDraw::draw_circle(sf::Vector2f(pt.x(), pt.y()), circle_shape->get_characteristic_length(), sf::Color::Green);
       auto linear = tf.linear();
 
-      auto column1 = linear.block<1, 3>(0,0);
+      auto column1 = linear.block<3, 1>(0,0);
+
       ImGui::Text("forward: %f %f", column1.x(), column1.y());
       //auto column2 = linear.block<1, 3>(1,0);
       auto pt_end = fcl::Vector3d(pt.x() + column1.x(), pt.y() + column1.y(), 0.0);
