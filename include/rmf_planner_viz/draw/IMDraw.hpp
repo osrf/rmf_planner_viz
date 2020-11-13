@@ -16,8 +16,8 @@
  *
 */
 
-#ifndef RMF_PLANNER_VIZ__DRAW__TRAJECTORY_HPP
-#define RMF_PLANNER_VIZ__DRAW__TRAJECTORY_HPP
+#ifndef RMF_PLANNER_VIZ__DRAW__IMDRAW_HPP
+#define RMF_PLANNER_VIZ__DRAW__IMDRAW_HPP
 
 #include <SFML/Graphics.hpp>
 
@@ -53,4 +53,4 @@ public:
 } // namespace draw
 } // namespace rmf_planner_viz
 
-#endif // RMF_PLANNER_VIZ__DRAW__TRAJECTORY_HPP
+#endif // RMF_PLANNER_VIZ__DRAW__IMDRAW_HPP
