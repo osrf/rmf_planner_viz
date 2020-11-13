@@ -89,5 +89,17 @@ if(fcl_FOUND)
       fcl
   )
   
+  add_executable(test_fcl_spline_offset
+    test/test_fcl_spline_offset.cpp
+    test/spline_offset_utils.cpp
+  )
+
+  target_link_libraries(
+    test_fcl_spline_offset
+    PUBLIC
+      rmf_planning_viz
+      ImGui-SFML::ImGui-SFML
+      fcl
+  )
 endif()
 
