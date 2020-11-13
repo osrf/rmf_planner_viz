@@ -12,6 +12,7 @@
   <depend>rmf_traffic</depend>
   <depend>SFML</depend>
   <depend>imgui_sfml</depend>
+  <depend>fcl</depend>
 
   <export>
     <build_type>ament_cmake</build_type>

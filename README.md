@@ -13,3 +13,11 @@ To build:
 9. `colcon build --cmake-args -DBUILD_SHARED_LIBS=ON -DIMGUI_DIR=<your colcon workspace>/src/imgui`
 
 Then you can start running interactive tests in the `./build/rmf_planner_viz/` directory
+
+----
+
+Optionally, you can build and run test_fcl_spline by cloning 
+
+https://github.com/ddengster/fcl.git with branch 0.6.1-fix-conservative-adv into your workspace
+
+alternatively, you can use the latest version of https://github.com/flexible-collision-library/fcl 

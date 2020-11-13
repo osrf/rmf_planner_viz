@@ -18,6 +18,7 @@
 #include <rmf_planner_viz/draw/IMDraw.hpp>
 #include <rmf_traffic/Motion.hpp>
 
+#include <math.h>
 #include <iostream>
 
 namespace rmf_planner_viz {
@@ -157,6 +158,76 @@ void IMDraw::draw_trajectory(const rmf_traffic::Trajectory& trajectory, const sf
     v.position = sf::Vector2f(pn.x(), pn.y());
     vtx_arr.append(v);
   }
+
+  g_vertexarrays.push_back(vtx_arr);
+}
+
+void IMDraw::draw_line(const sf::Vector2f& start, const sf::Vector2f& end, const sf::Color& color)
+{
+  if (g_vertexarrays.size() >= VERTEX_ARRAYS_LIMIT)
+  {
+    std::cout << "Vertex array limit exceeded" << std::endl;
+    return;
+  }
+
+  sf::VertexArray vtx_arr(sf::Lines);
+
+  sf::Vertex v;
+  v.color = color;
+
+  v.position = start;
+  vtx_arr.append(v);
+
+  v.position = end;
+  vtx_arr.append(v);
+
+  g_vertexarrays.push_back(vtx_arr);
+}
+
+void IMDraw::draw_arrow(const sf::Vector2f& start, const sf::Vector2f& end, const sf::Color& color)
+{
+  if (g_vertexarrays.size() >= VERTEX_ARRAYS_LIMIT)
+  {
+    std::cout << "Vertex array limit exceeded" << std::endl;
+    return;
+  }
+
+  sf::VertexArray vtx_arr(sf::Lines);
+
+  sf::Vertex v;
+  v.color = color;
+
+  v.position = start;
+  vtx_arr.append(v);
+
+  v.position = end;
+  vtx_arr.append(v);
+
+  // arrowhead
+  sf::Vector2f line_vec = end - start;
+  float lengthsq = line_vec.x * line_vec.x + line_vec.y * line_vec.y;
+  float length = sqrt(lengthsq);
+
+  auto line_norm = line_vec / length;
+  float rotation_rad = (3.0f * M_PI) / 4.0f;
+  
+  sf::Vector2f left_vec(
+    line_norm.x * cos(rotation_rad) - line_norm.y * sin(rotation_rad), 
+    line_norm.x * sin(rotation_rad) + line_norm.y * cos(rotation_rad));
+  sf::Vector2f right_vec(
+    line_norm.x * cos(-rotation_rad) - line_norm.y * sin(-rotation_rad), 
+    line_norm.x * sin(-rotation_rad) + line_norm.y * cos(-rotation_rad));
+  
+  const float arrowhead_len = 0.25f;
+  v.position = end;
+  vtx_arr.append(v);
+  v.position = end + left_vec * arrowhead_len;
+  vtx_arr.append(v);
+
+  v.position = end;
+  vtx_arr.append(v);
+  v.position = end + right_vec * arrowhead_len;
+  vtx_arr.append(v);
 
   g_vertexarrays.push_back(vtx_arr);
 }
