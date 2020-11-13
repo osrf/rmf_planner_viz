@@ -37,8 +37,6 @@ std::array<Eigen::Vector3d, 4> compute_knots(
   Eigen::Vector3d v0,
   Eigen::Vector3d v1);
 
-
-
 template <typename Shape1, typename Shape2, typename NarrowPhaseSolver>
 bool conservativeAdvancementWithOffset(
     const Shape1& o1, const fcl::MotionBase<typename Shape1::S>* motion1, const fcl::Transform3d& offset_o1,
@@ -200,4 +198,4 @@ S collide_shapes_with_offset(
 } // namespace draw
 } // namespace rmf_planner_viz
 
-#endif // RMF_PLANNER_VIZ__DRAW__TRAJECTORY_HPP
+#endif // RMF_PLANNER_VIZ__DRAW__SPLINEOFFSETUTILS_HPP

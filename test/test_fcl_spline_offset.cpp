@@ -120,14 +120,6 @@ int main()
   rmf_traffic::Profile profile_circle { circle_shape };
   rmf_traffic::Profile profile_circle_with_circle_offset { circle_shape };
 
-  auto knots_a =
-      rmf_planner_viz::draw::compute_knots(Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 0, 0),
-                    Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 0, 0));
-
-  auto knots_b =
-      rmf_planner_viz::draw::compute_knots(Eigen::Vector3d(-2, 0, 0), Eigen::Vector3d(-2, 0, EIGEN_PI / 2.0),
-                    Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 0, 0));
-
   auto to_fcl = [](const std::array<Eigen::Vector3d, 4>& knots) {
     std::array<Eigen::Vector3d, 4> Td;
     std::array<Eigen::Vector3d, 4> Rd;
@@ -142,18 +134,11 @@ int main()
                              Rd[3]);
   };
 
-  auto motion_a = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_a));
-  auto motion_b = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_b));
-
   // Test collision with unit spheres
   auto shape_a = std::make_shared<fcl::Sphere<double>>(0.5);
-  const auto obj_a = fcl::ContinuousCollisionObject<double>(shape_a, motion_a);
-
   auto shape_b = std::make_shared<fcl::Sphere<double>>(0.5);
-  const auto obj_b = fcl::ContinuousCollisionObject<double>(shape_b, motion_b);
-
   auto shape_b2 = std::make_shared<fcl::Sphere<double>>(0.6);
-  const auto obj_b2 = fcl::ContinuousCollisionObject<double>(shape_b2, motion_b);
+
   fcl::Transform3d shape_b2_offset;
   shape_b2_offset.setIdentity();
   shape_b2_offset.pretranslate(Eigen::Vector3d(0, -1.0, 0));
@@ -186,8 +171,49 @@ int main()
     using namespace rmf_planner_viz::draw;
 
     {
-      ImGui::Text("adasd");
+      // ImGui::Text("knots_b[0]: %f %f %f", knots_b[0][0], knots_b[0][1], knots_b[0][2]);
+      // ImGui::Text("knots_b[1]: %f %f %f", knots_b[1][0], knots_b[1][1], knots_b[1][2]);
+      // ImGui::Text("knots_b[2]: %f %f %f", knots_b[2][0], knots_b[2][1], knots_b[2][2]);
+      // ImGui::Text("knots_b[3]: %f %f %f", knots_b[3][0], knots_b[3][1], knots_b[3][2]);
+      std::shared_ptr<fcl::SplineMotion<double>> motion_a, motion_b;
+      static int current_preset = 0;
+      if (ImGui::Button("Preset #0"))
+        current_preset = 0;
+      if (ImGui::Button("Preset #1"))
+        current_preset = 1;
+      
       ImGui::Separator();
+
+      if (current_preset == 0)
+      {
+        auto knots_a =
+          rmf_planner_viz::draw::compute_knots(Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 0, 0),
+                        Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 0, 0));
+
+        auto knots_b =
+            rmf_planner_viz::draw::compute_knots(Eigen::Vector3d(-2, 0, 0), Eigen::Vector3d(-2, 0, EIGEN_PI / 2.0),
+                          Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 0, 0));
+
+        motion_a = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_a));
+        motion_b = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_b));
+      }
+      else if (current_preset == 1)
+      {
+        auto knots_a =
+          rmf_planner_viz::draw::compute_knots(Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 0, 0),
+                        Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 0, 0));
+
+        auto knots_b =
+            rmf_planner_viz::draw::compute_knots(Eigen::Vector3d(-2 - 0.15, 0, 0), Eigen::Vector3d(-2 + 0.15, 0, EIGEN_PI / 2.0),
+                          Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 0, 0));
+
+        motion_a = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_a));
+        motion_b = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_b));
+      }
+
+      const auto obj_a = fcl::ContinuousCollisionObject<double>(shape_a, motion_a);
+      const auto obj_b = fcl::ContinuousCollisionObject<double>(shape_b, motion_b);
+      const auto obj_b2 = fcl::ContinuousCollisionObject<double>(shape_b2, motion_b);
 
       fcl::ContinuousCollisionRequest<double> request;
       request.ccd_solver_type = fcl::CCDC_CONSERVATIVE_ADVANCEMENT;
