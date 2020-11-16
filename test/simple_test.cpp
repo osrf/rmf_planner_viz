@@ -26,9 +26,27 @@
 
 #include <rmf_traffic/schedule/Database.hpp>
 #include <rmf_traffic/agv/Planner.hpp>
+#include <rmf_traffic/agv/debug/Planner.hpp>
 #include <rmf_traffic/geometry/Circle.hpp>
 
 #include "imgui-SFML.h"
+
+// Hacky method to access the underlying container of std::priority_queue
+// normally we'll derive off std::priority_queue and add a get_container function
+// but this will suffice for the debugger's purposes
+// Returned container will not provide any guarantees about order
+template <class T, class S, class C>
+S& get_priority_queue_container(std::priority_queue<T, S, C>& queue)
+{
+  struct HackedQueue : private std::priority_queue<T, S, C> 
+  {
+    static S& Container(std::priority_queue<T, S, C>& queue) 
+    {
+      return queue.*&HackedQueue::c;
+    }
+  };
+  return HackedQueue::Container(queue);
+}
 
 int main()
 {
@@ -119,6 +137,7 @@ int main()
         rmf_traffic::agv::Planner::Configuration(graph_0, traits),
         rmf_traffic::agv::Planner::Options(nullptr));
 
+  /// Setup participants
   auto p0 = rmf_traffic::schedule::make_participant(
         rmf_traffic::schedule::ParticipantDescription{
           "participant_0",
@@ -128,9 +147,6 @@ int main()
         },
         database);
 
-  const auto now = std::chrono::steady_clock::now();
-  p0.set(planner_0.plan({now, 11, 0.0}, 3)->get_itinerary());
-
   auto p1 = rmf_traffic::schedule::make_participant(
         rmf_traffic::schedule::ParticipantDescription{
           "participant_1",
@@ -139,8 +155,6 @@ int main()
           profile
         },
         database);
-
-  p1.set(planner_0.plan({now, 12, 0.0}, 2)->get_itinerary());
 
   auto pa = rmf_traffic::schedule::make_participant(
         rmf_traffic::schedule::ParticipantDescription{
@@ -178,12 +192,30 @@ int main()
         },
         database);
 
-  p2.set(planner_0.plan(
-    {now, 10, 0.0}, 7,
-    rmf_traffic::agv::Plan::Options(
-    rmf_traffic::agv::ScheduleRouteValidator::make(
-        database, p2.id(), p2.description().profile())))->get_itinerary());
 
+  // set plans for the participants
+  const auto now = std::chrono::steady_clock::now();
+
+  std::vector<rmf_traffic::agv::Planner::Start> starts;
+  starts.emplace_back(now, 11, 0.0);
+  // starts.emplace_back(now, 12, 0.0);
+  // starts.emplace_back(now, 10, 0.0);
+
+  //p0.set(planner_0.plan(starts[0], 3)->get_itinerary());
+  // p1.set(planner_0.plan(starts[1], 2)->get_itinerary());
+  // p2.set(planner_0.plan(starts[2], 7,
+  //   rmf_traffic::agv::Plan::Options(
+  //   rmf_traffic::agv::ScheduleRouteValidator::make(
+  //       database, p2.id(), p2.description().profile())))->get_itinerary());
+
+  rmf_traffic::agv::Planner::Goal planner_goal(3);
+  rmf_traffic::agv::Planner::Debug planner_dbg_0(planner_0);
+  rmf_traffic::agv::Planner::Debug::Progress progress =
+    planner_dbg_0.begin(starts, planner_goal, planner_0.get_default_options());
+
+  rmf_utils::optional<rmf_traffic::agv::Plan> current_plan;
+  
+  //rmf_traffic::agv::Planner::Progress planner_dbg_0(planner_0);
   rmf_planner_viz::draw::Schedule schedule_drawable(
         database, 0.25, test_map_name, now);
 
@@ -232,16 +264,116 @@ int main()
 
     ImGui::SFML::Update(app_window, deltaClock.restart());
 
-    static bool demo_control = true;
-    static float demo_color[4] = { 1.f, 1.f, 1.f, 1.f};
     ImGui::SetWindowSize(ImVec2(600, 200));
     
     ImGui::Begin("Demo control panel", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
     ImGui::TextColored(ImVec4(0, 1, 0, 1), "Demo control panel");
-    ImGui::Checkbox("demo_control", &demo_control);
-    ImGui::ColorPicker4("colorpicker", demo_color);
     ImGui::End();
     
+    // Planner debugging
+    ImGui::SetWindowPos(ImVec2(800, 200));
+    ImGui::SetWindowSize(ImVec2(600, 800));
+    
+    ImGui::Begin("Planner AStar Debug", nullptr, ImGuiWindowFlags_None);
+
+    static bool show_node_trajectories = false;
+    if (ImGui::Checkbox("Show node trajectories", &show_node_trajectories))
+      ;
+    ImGui::Separator();
+    if (ImGui::Button("Preset #0"))
+    {
+      
+    }
+
+    
+    ImGui::Separator();
+
+    ImGui::TextColored(ImVec4(0, 1, 0, 1), "Current plan:");
+    ImGui::NewLine();
+    
+    ImGui::Text("Starts: ");
+    for (uint i=0; i<starts.size(); ++i)
+    {
+      char node_name[32] = { 0 };
+      snprintf(node_name, sizeof(node_name), "#%d", i);
+      if (ImGui::TreeNode(node_name))
+      {
+        ImGui::Text("Time: %f", starts[i].time().time_since_epoch());
+        ImGui::Text("Waypoint: %d", starts[i].waypoint());
+        ImGui::Text("Orientation: %d", starts[i].orientation());
+        ImGui::TreePop();
+      }
+    }
+
+    //goals
+    ImGui::NewLine();
+    ImGui::Text("Goal waypoint: %d", planner_goal.waypoint());
+    if (planner_goal.orientation())
+      ImGui::Text("Goal orientation: %f", *planner_goal.orientation());
+    else
+      ImGui::Text("No chosen goal orientation");
+
+    static int steps = 0;
+    ImGui::TextColored(ImVec4(0, 1, 0, 1), "Steps taken: %d", steps);
+    if (ImGui::Button("Step Forward"))
+    {
+      current_plan = progress.step();
+      ++steps;
+    }
+    if (ImGui::Button("Reset"))
+    {
+      progress = planner_dbg_0.begin(starts, planner_goal, planner_0.get_default_options());
+      steps = 0;
+      current_plan.reset();
+    }
+
+    ImGui::Separator();
+
+    if (current_plan)
+    {      
+      auto searchqueue = progress.queue();
+      auto& container = get_priority_queue_container(searchqueue);
+
+      ImGui::TextColored(ImVec4(0, 1, 0, 1), "AStar Node Count: %d", container.size());
+      ImGui::NewLine();
+
+      static int selected_idx = -1;
+      if (ImGui::ListBoxHeader("AStar Nodes"))
+      {
+        for (uint i=0; i<container.size(); ++i)
+        {
+          auto& node = container[i];
+          node->route_from_parent;
+          node->remaining_cost_estimate;
+          node->current_cost;
+          node->waypoint;
+          node->parent;
+          char node_name[32] = { 0 };
+          snprintf(node_name, sizeof(node_name), "Node %d", i);
+          if (ImGui::Selectable(node_name, (int)i == selected_idx))
+            selected_idx = i;
+        }
+        ImGui::ListBoxFooter();
+      }
+      
+      
+      ImGui::NewLine();
+      ImGui::Separator();
+      if (selected_idx != -1)
+      {
+        ImGui::TextColored(ImVec4(0, 1, 0, 1), "Node #%d Inspection", selected_idx);
+        auto selected_node = container[selected_idx];
+        ImGui::Text("Current Cost: %f", selected_node->current_cost);
+        ImGui::Text("Remaining Cost Estimate: %f", selected_node->remaining_cost_estimate);
+
+      }
+      
+      //bool changed = ImGui::ListBox("AStar Nodes", &item_selected, node_names.data(), node_names.size());
+    }
+    else
+      ImGui::TextColored(ImVec4(0, 1, 0, 1), "Current plan not available");
+
+    ImGui::End();
 
     ImGui::EndFrame();
 
