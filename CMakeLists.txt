@@ -103,3 +103,9 @@ if(fcl_FOUND)
   )
 endif()
 
+## copy font files
+install(
+  DIRECTORY fonts/
+  DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/fonts/
+)
+

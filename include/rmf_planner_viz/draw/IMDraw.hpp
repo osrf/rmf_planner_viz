@@ -36,7 +36,7 @@ public:
     const sf::Color& color = sf::Color(255, 255, 255, 255),
     uint slices = 16);
 
-  static void draw_axis();
+  static void draw_axis(float size = 1.0f);
 
   static void draw_trajectory(
     const rmf_traffic::Trajectory& trajectory,

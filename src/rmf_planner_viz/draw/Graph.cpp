@@ -22,8 +22,10 @@
 
 #include <SFML/Graphics/CircleShape.hpp>
 #include <SFML/Graphics/RenderTarget.hpp>
+#include <SFML/Graphics/Text.hpp>
 
 #include <unordered_set>
+#include <optional>
 #include <iostream>
 
 namespace rmf_planner_viz {
@@ -43,6 +45,7 @@ public:
     std::vector<std::size_t> mono_indices;
 
     std::vector<sf::CircleShape> waypoints;
+    std::vector<sf::Text> waypoints_text;
     std::vector<Eigen::Vector2f> waypoint_p;
     std::vector<std::size_t> waypoint_indices;
   };
@@ -75,7 +78,8 @@ public:
 
   Implementation(
       const rmf_traffic::agv::Graph& graph,
-      const float lane_width)
+      const float lane_width,
+      const sf::Font& font)
   {
     this->lane_width = lane_width;
     std::unordered_map<std::size_t, std::unordered_set<std::size_t>> used_lanes;
@@ -155,6 +159,15 @@ public:
         w0_shape.setPosition(p0.x(), p0.y());
         w0_shape.setFillColor(WaypointColor);
         map_data.waypoints.emplace_back(std::move(w0_shape));
+
+        sf::Text text;
+        text.setFont(font);
+        text.setString(std::to_string(j0));
+        text.setPosition(p0.x(), p0.y());
+        text.setScale(sf::Vector2f(1.f/30.f, -1.f/30.f));
+        text.setFillColor(sf::Color::Cyan);
+        map_data.waypoints_text.emplace_back(text);
+
         map_data.waypoint_p.push_back({p0.x(), p0.y()});
         map_data.waypoint_indices.push_back(j0);
       }
@@ -166,6 +179,15 @@ public:
         w1_shape.setPosition(p1.x(), p1.y());
         w1_shape.setFillColor(WaypointColor);
         map_data.waypoints.emplace_back(std::move(w1_shape));
+
+        sf::Text text;
+        text.setFont(font);
+        text.setString(std::to_string(j1));
+        text.setPosition(p1.x(), p1.y());
+        text.setScale(sf::Vector2f(1.f/30.f, -1.f/30.f));
+        text.setFillColor(sf::Color::Cyan);
+        map_data.waypoints_text.emplace_back(text);
+
         map_data.waypoint_p.push_back({p1.x(), p1.y()});
         map_data.waypoint_indices.push_back(j1);
       }
@@ -252,8 +274,9 @@ const sf::Color Graph::Implementation::WaypointColor = sf::Color::Blue;
 //==============================================================================
 Graph::Graph(
     const rmf_traffic::agv::Graph& graph,
-    const float lane_width)
-  : _pimpl(rmf_utils::make_impl<Implementation>(graph, lane_width))
+    const float lane_width,
+    const sf::Font& font)
+  : _pimpl(rmf_utils::make_impl<Implementation>(graph, lane_width, font))
 {
   // Do nothing
 }
@@ -388,6 +411,9 @@ void Graph::draw(sf::RenderTarget& target, sf::RenderStates states) const
     target.draw(s, states);
 
   for (const auto& s : map_data.waypoints)
+    target.draw(s, states);
+
+  for (const auto& s : map_data.waypoints_text)
     target.draw(s, states);
 }
 

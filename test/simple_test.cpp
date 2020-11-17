@@ -23,6 +23,7 @@
 #include <rmf_planner_viz/draw/Graph.hpp>
 #include <rmf_planner_viz/draw/Schedule.hpp>
 #include <rmf_planner_viz/draw/IMDraw.hpp>
+#include <rmf_planner_viz/draw/Trajectory.hpp>
 
 #include <rmf_traffic/schedule/Database.hpp>
 #include <rmf_traffic/agv/Planner.hpp>
@@ -50,6 +51,13 @@ S& get_priority_queue_container(std::priority_queue<T, S, C>& queue)
 
 int main()
 {
+  sf::Font font;
+  if (!font.loadFromFile("./build/rmf_planner_viz/fonts/Ubuntu-B.ttf"))
+  {
+    std::cout << "Failed to load font. Make sure you run the executable from the colcon directory" << std::endl;
+    return -1;
+  }
+  
   const rmf_traffic::Profile profile{
     rmf_traffic::geometry::make_final_convex<
       rmf_traffic::geometry::Circle>(1.0)
@@ -117,7 +125,7 @@ int main()
   graph_0.add_lane(11, 9);
   graph_0.add_lane(12, 10);
 
-  rmf_planner_viz::draw::Graph graph_0_drawable(graph_0, 1.0);
+  rmf_planner_viz::draw::Graph graph_0_drawable(graph_0, 1.0, font);
 
   rmf_traffic::agv::Graph graph_1;
   graph_1.add_waypoint(test_map_name, {-5.0, 15.0}); // 0
@@ -128,7 +136,7 @@ int main()
   graph_1.add_lane(2, 1);
   graph_1.add_lane(3, 2);
 
-  rmf_planner_viz::draw::Graph graph_1_drawable(graph_1, 0.5);
+  rmf_planner_viz::draw::Graph graph_1_drawable(graph_1, 0.5, font);
 
   std::shared_ptr<rmf_traffic::schedule::Database> database =
       std::make_shared<rmf_traffic::schedule::Database>();
@@ -265,7 +273,6 @@ int main()
     ImGui::SFML::Update(app_window, deltaClock.restart());
 
     ImGui::SetWindowSize(ImVec2(600, 200));
-    
     ImGui::Begin("Demo control panel", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
     ImGui::TextColored(ImVec4(0, 1, 0, 1), "Demo control panel");
     ImGui::End();
@@ -276,9 +283,9 @@ int main()
     
     ImGui::Begin("Planner AStar Debug", nullptr, ImGuiWindowFlags_None);
 
-    static bool show_node_trajectories = false;
-    if (ImGui::Checkbox("Show node trajectories", &show_node_trajectories))
-      ;
+    static bool show_node_trajectories = true;
+    ImGui::Checkbox("Show node trajectories", &show_node_trajectories);
+
     ImGui::Separator();
     if (ImGui::Button("Preset #0"))
     {
@@ -329,6 +336,8 @@ int main()
 
     ImGui::Separator();
 
+    static std::optional<rmf_planner_viz::draw::Trajectory> trajectory_to_render;
+
     if (current_plan)
     {      
       auto searchqueue = progress.queue();
@@ -344,12 +353,10 @@ int main()
         {
           auto& node = container[i];
           node->route_from_parent;
-          node->remaining_cost_estimate;
-          node->current_cost;
-          node->waypoint;
           node->parent;
           char node_name[32] = { 0 };
-          snprintf(node_name, sizeof(node_name), "Node %d", i);
+          snprintf(node_name, sizeof(node_name), "Node %d (score: %f)",
+            i, node->current_cost + node->remaining_cost_estimate);
           if (ImGui::Selectable(node_name, (int)i == selected_idx))
             selected_idx = i;
         }
@@ -365,10 +372,15 @@ int main()
         auto selected_node = container[selected_idx];
         ImGui::Text("Current Cost: %f", selected_node->current_cost);
         ImGui::Text("Remaining Cost Estimate: %f", selected_node->remaining_cost_estimate);
+        ImGui::Text("Waypoint: %d", selected_node->waypoint);
 
+        const rmf_traffic::Route& route = selected_node->route_from_parent;
+        ImGui::Text("Trajectory Size: %d" ,route.trajectory().size());
+        ImGui::Text("Trajectory Duration: %f", route.trajectory().duration());
+
+        trajectory_to_render = rmf_planner_viz::draw::Trajectory(route.trajectory(), 
+          profile, now, route.trajectory().duration(), sf::Color::Green, { 0.0, 0.0 }, 0.5f);
       }
-      
-      //bool changed = ImGui::ListBox("AStar Nodes", &item_selected, node_names.data(), node_names.size());
     }
     else
       ImGui::TextColored(ImVec4(0, 1, 0, 1), "Current plan not available");
@@ -376,6 +388,8 @@ int main()
     ImGui::End();
 
     ImGui::EndFrame();
+
+    //rmf_planner_viz::draw::IMDraw::draw_axis();
 
     /*** drawing ***/
     app_window.clear();
@@ -387,13 +401,11 @@ int main()
     app_window.draw(graph_0_drawable, states);
     app_window.draw(graph_1_drawable, states);
     app_window.draw(schedule_drawable, states);
+    if (show_node_trajectories && trajectory_to_render)
+      app_window.draw(*trajectory_to_render, states);
 
-    {
-      sf::Transformable vqs;
-      vqs.setScale(1.f, -1.f);
-      auto tx_flipped_2d = vqs.getTransform();
-      rmf_planner_viz::draw::IMDraw::flush_and_render(app_window, tx_flipped_2d);
-    }
+    rmf_planner_viz::draw::IMDraw::flush_and_render(app_window, states.transform);
+    
 
     ImGui::SFML::Render(app_window);
     app_window.display();
