@@ -35,7 +35,7 @@ namespace draw {
 class Trajectory : public sf::Drawable
 {
 public:
-  Trajectory() { }
+  
   Trajectory(
       const rmf_traffic::Trajectory& trajectory,
       const rmf_traffic::Profile& profile,

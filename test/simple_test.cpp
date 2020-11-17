@@ -281,7 +281,7 @@ int main()
     ImGui::SetWindowPos(ImVec2(800, 200));
     ImGui::SetWindowSize(ImVec2(600, 800));
     
-    ImGui::Begin("Planner AStar Debug", nullptr, ImGuiWindowFlags_None);
+    ImGui::Begin("Planner AStar Debug", nullptr, ImGuiWindowFlags_HorizontalScrollbar);
 
     static bool show_node_trajectories = true;
     ImGui::Checkbox("Show node trajectories", &show_node_trajectories);
@@ -291,41 +291,41 @@ int main()
     {
       
     }
-
     
     ImGui::Separator();
 
-    ImGui::TextColored(ImVec4(0, 1, 0, 1), "Current plan:");
-    ImGui::NewLine();
-    
-    ImGui::Text("Starts: ");
-    for (uint i=0; i<starts.size(); ++i)
+    if (ImGui::TreeNode("Current Plan"))
     {
-      char node_name[32] = { 0 };
-      snprintf(node_name, sizeof(node_name), "#%d", i);
-      if (ImGui::TreeNode(node_name))
+      ImGui::Text("Starts: ");
+      for (uint i=0; i<starts.size(); ++i)
       {
+        ImGui::Text("#%d", i);
         ImGui::Text("Time: %f", starts[i].time().time_since_epoch());
         ImGui::Text("Waypoint: %d", starts[i].waypoint());
         ImGui::Text("Orientation: %d", starts[i].orientation());
-        ImGui::TreePop();
       }
+
+      //goals
+      ImGui::NewLine();
+      ImGui::Text("Goal waypoint: %d", planner_goal.waypoint());
+      if (planner_goal.orientation())
+        ImGui::Text("Goal orientation: %f", *planner_goal.orientation());
+      else
+        ImGui::Text("No chosen goal orientation");
+      ImGui::TreePop();
     }
+    ImGui::Separator();
 
-    //goals
-    ImGui::NewLine();
-    ImGui::Text("Goal waypoint: %d", planner_goal.waypoint());
-    if (planner_goal.orientation())
-      ImGui::Text("Goal orientation: %f", *planner_goal.orientation());
-    else
-      ImGui::Text("No chosen goal orientation");
-
+    static auto plan_generation_timestamp = now;
+    static float timeline_duration = 0.0f;
     static int steps = 0;
+    ImGui::TextColored(ImVec4(0, 1, 0, 1), "AStar plan generation", steps);
     ImGui::TextColored(ImVec4(0, 1, 0, 1), "Steps taken: %d", steps);
     if (ImGui::Button("Step Forward"))
     {
       current_plan = progress.step();
       ++steps;
+      plan_generation_timestamp = std::chrono::steady_clock::now();
     }
     if (ImGui::Button("Reset"))
     {
@@ -333,11 +333,12 @@ int main()
       steps = 0;
       current_plan.reset();
     }
-
+    
     ImGui::Separator();
 
-    static std::optional<rmf_planner_viz::draw::Trajectory> trajectory_to_render;
-
+    static std::vector<rmf_planner_viz::draw::Trajectory> trajectories_to_render;
+    trajectories_to_render.clear();
+    
     if (current_plan)
     {      
       auto searchqueue = progress.queue();
@@ -363,7 +364,6 @@ int main()
         ImGui::ListBoxFooter();
       }
       
-      
       ImGui::NewLine();
       ImGui::Separator();
       if (selected_idx != -1)
@@ -373,14 +373,50 @@ int main()
         ImGui::Text("Current Cost: %f", selected_node->current_cost);
         ImGui::Text("Remaining Cost Estimate: %f", selected_node->remaining_cost_estimate);
         ImGui::Text("Waypoint: %d", selected_node->waypoint);
+        if (selected_node->start_set_index)
+          ImGui::Text("start_set_index: %d", *selected_node->start_set_index);
+        
 
         const rmf_traffic::Route& route = selected_node->route_from_parent;
-        ImGui::Text("Trajectory Size: %d" ,route.trajectory().size());
-        ImGui::Text("Trajectory Duration: %f", route.trajectory().duration());
+        if (route.trajectory().start_time())
+          ImGui::Text("Node Traj start time: %llu",  route.trajectory().start_time()->time_since_epoch());
+        if (route.trajectory().finish_time())
+          ImGui::Text("Node Traj finish time: %llu", route.trajectory().finish_time()->time_since_epoch());
+        ImGui::Text("Node Traj duration: %f", rmf_traffic::time::to_seconds(route.trajectory().duration()));
 
-        trajectory_to_render = rmf_planner_viz::draw::Trajectory(route.trajectory(), 
-          profile, now, route.trajectory().duration(), sf::Color::Green, { 0.0, 0.0 }, 0.5f);
+        ImGui::NewLine();
+        
+        double max_duration = selected_node->current_cost + selected_node->remaining_cost_estimate;
+        ImGui::SliderFloat("Timeline Control", &timeline_duration, 0.0f, static_cast<float>(max_duration));
+
+        auto trajectory_time = rmf_traffic::time::apply_offset(plan_generation_timestamp, static_cast<double>(timeline_duration));
+
+        auto add_trajectory_to_render = [trajectory_time, profile](
+          std::vector<rmf_planner_viz::draw::Trajectory>& to_render,
+          rmf_traffic::agv::Planner::Debug::ConstNodePtr node)
+        {
+          const rmf_traffic::Route& route = node->route_from_parent;
+          auto trajectory = rmf_planner_viz::draw::Trajectory(route.trajectory(), 
+            profile, trajectory_time, route.trajectory().duration(), sf::Color::Green, { 0.0, 0.0 }, 0.5f);
+          to_render.push_back(trajectory);
+        };
+        add_trajectory_to_render(trajectories_to_render, selected_node);
+
+        static bool render_parent_trajectories = false;
+        ImGui::Checkbox("Render Parent Trajectories", &render_parent_trajectories);
+        if (render_parent_trajectories)
+        {
+          auto parent_node = selected_node->parent;
+          while (parent_node)
+          {
+            add_trajectory_to_render(trajectories_to_render, parent_node);
+            parent_node = parent_node->parent;
+          }
+        }
+        
       }
+      else
+        trajectories_to_render.clear();
     }
     else
       ImGui::TextColored(ImVec4(0, 1, 0, 1), "Current plan not available");
@@ -401,8 +437,11 @@ int main()
     app_window.draw(graph_0_drawable, states);
     app_window.draw(graph_1_drawable, states);
     app_window.draw(schedule_drawable, states);
-    if (show_node_trajectories && trajectory_to_render)
-      app_window.draw(*trajectory_to_render, states);
+    if (show_node_trajectories)
+    {
+      for (const auto& trajectory : trajectories_to_render)
+        app_window.draw(trajectory, states);
+    }
 
     rmf_planner_viz::draw::IMDraw::flush_and_render(app_window, states.transform);
     
