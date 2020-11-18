@@ -169,7 +169,7 @@ public:
           start + duration.value() : motion->finish_time();
     const auto begin = motion->start_time();
 
-    if (motion->start_time() <= start)
+    if (motion->start_time() <= start && start <= motion->finish_time())
     {
       const Eigen::Vector3d p = motion->compute_position(start);
       configure_arrow(p, profile.footprint()->get_characteristic_length(), color);
