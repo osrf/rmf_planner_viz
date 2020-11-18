@@ -31,23 +31,7 @@
 #include <rmf_traffic/geometry/Circle.hpp>
 
 #include "imgui-SFML.h"
-
-// Hacky method to access the underlying container of std::priority_queue
-// normally we'll derive off std::priority_queue and add a get_container function
-// but this will suffice for the debugger's purposes
-// Returned container will not provide any guarantees about order
-template <class T, class S, class C>
-S& get_priority_queue_container(std::priority_queue<T, S, C>& queue)
-{
-  struct HackedQueue : private std::priority_queue<T, S, C> 
-  {
-    static S& Container(std::priority_queue<T, S, C>& queue) 
-    {
-      return queue.*&HackedQueue::c;
-    }
-  };
-  return HackedQueue::Container(queue);
-}
+#include "planner_debug.hpp"
 
 int main()
 {
@@ -216,13 +200,11 @@ int main()
   //   rmf_traffic::agv::ScheduleRouteValidator::make(
   //       database, p2.id(), p2.description().profile())))->get_itinerary());
 
-  rmf_traffic::agv::Planner::Goal planner_goal(3);
-  rmf_traffic::agv::Planner::Debug planner_dbg_0(planner_0);
+  rmf_traffic::agv::Planner::Goal goal(3);
+  rmf_traffic::agv::Planner::Debug planner_debug(planner_0);
   rmf_traffic::agv::Planner::Debug::Progress progress =
-    planner_dbg_0.begin(starts, planner_goal, planner_0.get_default_options());
+    planner_debug.begin(starts, goal, planner_0.get_default_options());
 
-  rmf_utils::optional<rmf_traffic::agv::Plan> current_plan;
-  
   //rmf_traffic::agv::Planner::Progress planner_dbg_0(planner_0);
   rmf_planner_viz::draw::Schedule schedule_drawable(
         database, 0.25, test_map_name, now);
@@ -271,158 +253,13 @@ int main()
     }
 
     ImGui::SFML::Update(app_window, deltaClock.restart());
-
-    ImGui::SetWindowSize(ImVec2(600, 200));
-    ImGui::Begin("Demo control panel", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
-    ImGui::TextColored(ImVec4(0, 1, 0, 1), "Demo control panel");
-    ImGui::End();
     
-    // Planner debugging
-    ImGui::SetWindowPos(ImVec2(800, 200));
-    ImGui::SetWindowSize(ImVec2(600, 800));
-    
-    ImGui::Begin("Planner AStar Debug", nullptr, ImGuiWindowFlags_HorizontalScrollbar);
-
     static bool show_node_trajectories = true;
-    ImGui::Checkbox("Show node trajectories", &show_node_trajectories);
-
-    ImGui::Separator();
-    if (ImGui::Button("Preset #0"))
-    {
-      
-    }
-    
-    ImGui::Separator();
-
-    if (ImGui::TreeNode("Current Plan"))
-    {
-      ImGui::Text("Starts: ");
-      for (uint i=0; i<starts.size(); ++i)
-      {
-        ImGui::Text("#%d", i);
-        ImGui::Text("Time: %f", starts[i].time().time_since_epoch());
-        ImGui::Text("Waypoint: %d", starts[i].waypoint());
-        ImGui::Text("Orientation: %d", starts[i].orientation());
-      }
-
-      //goals
-      ImGui::NewLine();
-      ImGui::Text("Goal waypoint: %d", planner_goal.waypoint());
-      if (planner_goal.orientation())
-        ImGui::Text("Goal orientation: %f", *planner_goal.orientation());
-      else
-        ImGui::Text("No chosen goal orientation");
-      ImGui::TreePop();
-    }
-    ImGui::Separator();
-
-    static auto plan_generation_timestamp = now;
-    static float timeline_duration = 0.0f;
-    static int steps = 0;
-    ImGui::TextColored(ImVec4(0, 1, 0, 1), "AStar plan generation", steps);
-    ImGui::TextColored(ImVec4(0, 1, 0, 1), "Steps taken: %d", steps);
-    if (ImGui::Button("Step Forward"))
-    {
-      current_plan = progress.step();
-      ++steps;
-      plan_generation_timestamp = std::chrono::steady_clock::now();
-    }
-    if (ImGui::Button("Reset"))
-    {
-      progress = planner_dbg_0.begin(starts, planner_goal, planner_0.get_default_options());
-      steps = 0;
-      current_plan.reset();
-    }
-    
-    ImGui::Separator();
-
     static std::vector<rmf_planner_viz::draw::Trajectory> trajectories_to_render;
-    trajectories_to_render.clear();
+
+    do_planner_debug(profile, planner_0, starts, goal, planner_debug, progress, now,
+      show_node_trajectories, trajectories_to_render);
     
-    if (current_plan)
-    {      
-      auto searchqueue = progress.queue();
-      auto& container = get_priority_queue_container(searchqueue);
-
-      ImGui::TextColored(ImVec4(0, 1, 0, 1), "AStar Node Count: %d", container.size());
-      ImGui::NewLine();
-
-      static int selected_idx = -1;
-      if (ImGui::ListBoxHeader("AStar Nodes"))
-      {
-        for (uint i=0; i<container.size(); ++i)
-        {
-          auto& node = container[i];
-          node->route_from_parent;
-          node->parent;
-          char node_name[32] = { 0 };
-          snprintf(node_name, sizeof(node_name), "Node %d (score: %f)",
-            i, node->current_cost + node->remaining_cost_estimate);
-          if (ImGui::Selectable(node_name, (int)i == selected_idx))
-            selected_idx = i;
-        }
-        ImGui::ListBoxFooter();
-      }
-      
-      ImGui::NewLine();
-      ImGui::Separator();
-      if (selected_idx != -1)
-      {
-        ImGui::TextColored(ImVec4(0, 1, 0, 1), "Node #%d Inspection", selected_idx);
-        auto selected_node = container[selected_idx];
-        ImGui::Text("Current Cost: %f", selected_node->current_cost);
-        ImGui::Text("Remaining Cost Estimate: %f", selected_node->remaining_cost_estimate);
-        ImGui::Text("Waypoint: %d", selected_node->waypoint);
-        if (selected_node->start_set_index)
-          ImGui::Text("start_set_index: %d", *selected_node->start_set_index);
-        
-
-        const rmf_traffic::Route& route = selected_node->route_from_parent;
-        if (route.trajectory().start_time())
-          ImGui::Text("Node Traj start time: %llu",  route.trajectory().start_time()->time_since_epoch());
-        if (route.trajectory().finish_time())
-          ImGui::Text("Node Traj finish time: %llu", route.trajectory().finish_time()->time_since_epoch());
-        ImGui::Text("Node Traj duration: %f", rmf_traffic::time::to_seconds(route.trajectory().duration()));
-
-        ImGui::NewLine();
-        
-        double max_duration = selected_node->current_cost + selected_node->remaining_cost_estimate;
-        ImGui::SliderFloat("Timeline Control", &timeline_duration, 0.0f, static_cast<float>(max_duration));
-
-        auto trajectory_time = rmf_traffic::time::apply_offset(plan_generation_timestamp, static_cast<double>(timeline_duration));
-
-        auto add_trajectory_to_render = [trajectory_time, profile](
-          std::vector<rmf_planner_viz::draw::Trajectory>& to_render,
-          rmf_traffic::agv::Planner::Debug::ConstNodePtr node)
-        {
-          const rmf_traffic::Route& route = node->route_from_parent;
-          auto trajectory = rmf_planner_viz::draw::Trajectory(route.trajectory(), 
-            profile, trajectory_time, route.trajectory().duration(), sf::Color::Green, { 0.0, 0.0 }, 0.5f);
-          to_render.push_back(trajectory);
-        };
-        add_trajectory_to_render(trajectories_to_render, selected_node);
-
-        static bool render_parent_trajectories = false;
-        ImGui::Checkbox("Render Parent Trajectories", &render_parent_trajectories);
-        if (render_parent_trajectories)
-        {
-          auto parent_node = selected_node->parent;
-          while (parent_node)
-          {
-            add_trajectory_to_render(trajectories_to_render, parent_node);
-            parent_node = parent_node->parent;
-          }
-        }
-        
-      }
-      else
-        trajectories_to_render.clear();
-    }
-    else
-      ImGui::TextColored(ImVec4(0, 1, 0, 1), "Current plan not available");
-
-    ImGui::End();
-
     ImGui::EndFrame();
 
     //rmf_planner_viz::draw::IMDraw::draw_axis();
