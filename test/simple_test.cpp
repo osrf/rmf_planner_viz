@@ -68,6 +68,7 @@ int main()
   graph_0.add_waypoint(test_map_name, {0.0, 10.0}); // 10
   graph_0.add_waypoint(test_map_name, {5.0, 10.0}); // 11
   graph_0.add_waypoint(test_map_name, {-12.0, 10.0}); // 12
+  graph_0.add_key("Waypoint #0", 0);
 
   /*            0<------------1<------------2
    *                                        ^

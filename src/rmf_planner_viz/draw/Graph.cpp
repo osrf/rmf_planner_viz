@@ -85,6 +85,31 @@ public:
     std::unordered_map<std::size_t, std::unordered_set<std::size_t>> used_lanes;
     std::unordered_set<std::size_t> used_vertices;
 
+    for (std::size_t i=0; i < graph.num_waypoints(); ++i)
+    {
+      const auto& waypoint = graph.get_waypoint(i);
+      sf::Text text;
+      text.setFont(font);
+      if (waypoint.name())
+      {
+        std::string name = *waypoint.name();
+        name += " (";
+        name += std::to_string(waypoint.index());
+        name += ")";
+        text.setString(name);
+      }
+      else
+        text.setString(std::to_string(waypoint.index()));
+      text.setPosition(waypoint.get_location().x(), waypoint.get_location().y());
+
+      //minor scale hack
+      text.setScale(sf::Vector2f(1.f/40.f, -1.f/40.f));
+      text.setFillColor(sf::Color::Cyan);
+
+      auto& map_data = data[waypoint.get_map_name()];
+      map_data.waypoints_text.emplace_back(text);
+    }
+
     for (std::size_t i=0; i < graph.num_lanes(); ++i)
     {
       const auto& lane = graph.get_lane(i);
@@ -160,14 +185,6 @@ public:
         w0_shape.setFillColor(WaypointColor);
         map_data.waypoints.emplace_back(std::move(w0_shape));
 
-        sf::Text text;
-        text.setFont(font);
-        text.setString(std::to_string(j0));
-        text.setPosition(p0.x(), p0.y());
-        text.setScale(sf::Vector2f(1.f/30.f, -1.f/30.f));
-        text.setFillColor(sf::Color::Cyan);
-        map_data.waypoints_text.emplace_back(text);
-
         map_data.waypoint_p.push_back({p0.x(), p0.y()});
         map_data.waypoint_indices.push_back(j0);
       }
@@ -179,14 +196,6 @@ public:
         w1_shape.setPosition(p1.x(), p1.y());
         w1_shape.setFillColor(WaypointColor);
         map_data.waypoints.emplace_back(std::move(w1_shape));
-
-        sf::Text text;
-        text.setFont(font);
-        text.setString(std::to_string(j1));
-        text.setPosition(p1.x(), p1.y());
-        text.setScale(sf::Vector2f(1.f/30.f, -1.f/30.f));
-        text.setFillColor(sf::Color::Cyan);
-        map_data.waypoints_text.emplace_back(text);
 
         map_data.waypoint_p.push_back({p1.x(), p1.y()});
         map_data.waypoint_indices.push_back(j1);
