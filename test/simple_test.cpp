@@ -68,7 +68,7 @@ int main()
   graph_0.add_waypoint(test_map_name, {0.0, 10.0}); // 10
   graph_0.add_waypoint(test_map_name, {5.0, 10.0}); // 11
   graph_0.add_waypoint(test_map_name, {-12.0, 10.0}); // 12
-  graph_0.add_key("Waypoint #0", 0);
+  graph_0.add_key("Interesting Waypoint", 0);
 
   /*            0<------------1<------------2
    *                                        ^
@@ -194,7 +194,7 @@ int main()
   // starts.emplace_back(now, 12, 0.0);
   // starts.emplace_back(now, 10, 0.0);
 
-  //p0.set(planner_0.plan(starts[0], 3)->get_itinerary());
+  // p0.set(planner_0.plan(starts[0], 3)->get_itinerary());
   // p1.set(planner_0.plan(starts[1], 2)->get_itinerary());
   // p2.set(planner_0.plan(starts[2], 7,
   //   rmf_traffic::agv::Plan::Options(

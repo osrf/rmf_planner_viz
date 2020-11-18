@@ -87,11 +87,19 @@ void do_planner_debug(
     current_plan = progress.step();
     ++steps;
   }
-  if (ImGui::Button("Reset"))
+  
+  static int steps_jump = 0;
+  ImGui::InputInt("Jump steps", &steps_jump);
+  char reset_label[32] = { 0 };
+  snprintf(reset_label, sizeof(reset_label), "Reset to %d steps", steps_jump);
+  if (ImGui::Button(reset_label))
   {
     progress = debug.begin(starts, goal, planner.get_default_options());
-    steps = 0;
+
     current_plan.reset();
+    for (uint i=0; i<steps_jump; ++i)
+      current_plan = progress.step();
+    steps = steps_jump;
   }
   
   ImGui::Separator();
