@@ -40,6 +40,9 @@ void do_planner_debug(
   std::vector<rmf_planner_viz::draw::Trajectory>& trajectories_to_render)
 {
   static rmf_utils::optional<rmf_traffic::agv::Plan> current_plan;
+  static float timeline_duration = 0.0f;
+  static int steps = 0;
+  static int selected_node_idx = -1;
 
   ImGui::SetWindowPos(ImVec2(800, 200));
   ImGui::SetWindowSize(ImVec2(600, 800));
@@ -51,32 +54,38 @@ void do_planner_debug(
   ImGui::Separator();
   
   // presets
-  bool preset_triggered = false;
-  if (ImGui::Button("Preset #0"))
+  if (ImGui::TreeNode("Presets"))
   {
-    starts.clear();
-    starts.emplace_back(start_timing, 11, 0.0);
-    goal = rmf_traffic::agv::Planner::Goal(3);
-    preset_triggered = true;
-  }
-  if (ImGui::Button("Preset #1"))
-  {
-    starts.clear();
-    starts.emplace_back(start_timing, 10, 0.0);
-    goal = rmf_traffic::agv::Planner::Goal(3);
-    preset_triggered = true;
-  }
-  if (ImGui::Button("Preset #2"))
-  {
-    starts.clear();
-    starts.emplace_back(start_timing, 9, 0.0);
-    goal = rmf_traffic::agv::Planner::Goal(3);
-    preset_triggered = true;
-  }
-  if (preset_triggered)
-  {
-    progress = debug.begin(starts, goal, planner.get_default_options());
-    current_plan.reset();
+    bool preset_triggered = false;
+    if (ImGui::Button("Preset #0"))
+    {
+      starts.clear();
+      starts.emplace_back(start_timing, 11, 0.0);
+      goal = rmf_traffic::agv::Planner::Goal(3);
+      preset_triggered = true;
+    }
+    if (ImGui::Button("Preset #1"))
+    {
+      starts.clear();
+      starts.emplace_back(start_timing, 10, 0.0);
+      goal = rmf_traffic::agv::Planner::Goal(3);
+      preset_triggered = true;
+    }
+    if (ImGui::Button("Preset #2"))
+    {
+      starts.clear();
+      starts.emplace_back(start_timing, 9, 0.0);
+      goal = rmf_traffic::agv::Planner::Goal(3);
+      preset_triggered = true;
+    }
+    if (preset_triggered)
+    {
+      progress = debug.begin(starts, goal, planner.get_default_options());
+      current_plan.reset();
+      steps = 0;
+      selected_node_idx = -1;
+    }
+    ImGui::TreePop();
   }
   
   ImGui::Separator();
@@ -103,8 +112,6 @@ void do_planner_debug(
   }
   ImGui::Separator();
 
-  static float timeline_duration = 0.0f;
-  static int steps = 0;
   ImGui::TextColored(ImVec4(0, 1, 0, 1), "AStar plan generation", steps);
   ImGui::TextColored(ImVec4(0, 1, 0, 1), "Steps taken: %d", steps);
   if (ImGui::Button("Step forward"))
@@ -155,29 +162,26 @@ void do_planner_debug(
     ImGui::TextColored(ImVec4(0, 1, 0, 1), "AStar Node Count: %d", container.size());
     ImGui::NewLine();
 
-    static int selected_idx = -1;
     if (ImGui::ListBoxHeader("AStar Nodes"))
     {
       for (uint i=0; i<container.size(); ++i)
       {
         auto& node = container[i];
-        node->route_from_parent;
-        node->parent;
         char node_name[32] = { 0 };
         snprintf(node_name, sizeof(node_name), "Node %d (score: %f)",
           i, node->current_cost + node->remaining_cost_estimate);
-        if (ImGui::Selectable(node_name, (int)i == selected_idx))
-          selected_idx = i;
+        if (ImGui::Selectable(node_name, (int)i == selected_node_idx))
+          selected_node_idx = i;
       }
       ImGui::ListBoxFooter();
     }
     
     ImGui::NewLine();
     ImGui::Separator();
-    if (selected_idx != -1)
+    if (selected_node_idx != -1 && selected_node_idx < container.size())
     {
-      ImGui::TextColored(ImVec4(0, 1, 0, 1), "Node #%d Inspection", selected_idx);
-      auto selected_node = container[selected_idx];
+      ImGui::TextColored(ImVec4(0, 1, 0, 1), "Node #%d Inspection", selected_node_idx);
+      auto selected_node = container[selected_node_idx];
       ImGui::Text("Current Cost: %f", selected_node->current_cost);
       ImGui::Text("Remaining Cost Estimate: %f", selected_node->remaining_cost_estimate);
       ImGui::Text("Waypoint: %d", selected_node->waypoint);
@@ -212,20 +216,31 @@ void do_planner_debug(
 
       //double max_duration = selected_node->current_cost + selected_node->remaining_cost_estimate;
       double max_duration = rmf_traffic::time::to_seconds(route.trajectory().duration());
-      if (render_parent_trajectories)
+
+      int parent_count = 0;
+      std::string parent_waypoint_str = "Parent waypoints idx: [";
+      auto parent_node = selected_node->parent;
+      while (parent_node)
       {
-        int x = 0;
-        auto parent_node = selected_node->parent;
-        while (parent_node)
-        {
-          const rmf_traffic::Route& route = parent_node->route_from_parent;
-          max_duration += rmf_traffic::time::to_seconds(route.trajectory().duration());
+        const rmf_traffic::Route& route = parent_node->route_from_parent;
+        max_duration += rmf_traffic::time::to_seconds(route.trajectory().duration());
+        if (render_parent_trajectories)
           add_trajectory_to_render(trajectories_to_render, parent_node);
-          parent_node = parent_node->parent;
-          ++x;
-        }
-        ImGui::Text("count: %d", x);
+
+        if (parent_node->waypoint)
+          parent_waypoint_str += std::to_string(*parent_node->waypoint);
+        else
+          parent_waypoint_str += "?";
+        parent_waypoint_str += ", ";
+        parent_node = parent_node->parent;
+        ++parent_count;
       }
+      ImGui::Text("Parent count: %d", parent_count);
+      parent_waypoint_str += "]";
+      ImGui::Text(parent_waypoint_str.c_str());
+
+      if (timeline_duration > max_duration)
+        timeline_duration = max_duration;
       ImGui::SliderFloat("Timeline Control", &timeline_duration, 0.0f, static_cast<float>(max_duration));
     }
     else
