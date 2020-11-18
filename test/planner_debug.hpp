@@ -44,7 +44,6 @@ S& get_priority_queue_container(std::priority_queue<T, S, C>& queue)
 }
 
 void do_planner_debug(
-  // inputs
   const rmf_traffic::Profile& profile, 
   rmf_traffic::agv::Planner& planner,
   std::vector<rmf_traffic::agv::Planner::Start>& starts,
@@ -53,7 +52,6 @@ void do_planner_debug(
   rmf_traffic::agv::Planner::Debug::Progress& progress,
   const std::chrono::steady_clock::time_point& start_timing,
   bool& show_node_trajectories,
-  // output
   std::vector<rmf_planner_viz::draw::Trajectory>& trajectories_to_render);
 
 #endif

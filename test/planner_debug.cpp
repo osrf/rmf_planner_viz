@@ -96,23 +96,23 @@ void do_planner_debug(
     for (uint i=0; i<starts.size(); ++i)
     {
       ImGui::Text("#%d", i);
-      ImGui::Text("Time: %llu", starts[i].time().time_since_epoch().count());
-      ImGui::Text("Waypoint: %llu", starts[i].waypoint());
+      ImGui::Text("Time: %ld", starts[i].time().time_since_epoch().count());
+      ImGui::Text("Waypoint: %lu", starts[i].waypoint());
       ImGui::Text("Orientation: %f", starts[i].orientation());
     }
 
     //goals
     ImGui::NewLine();
-    ImGui::Text("Goal waypoint: %llu", goal.waypoint());
+    ImGui::Text("Goal waypoint: %lu", goal.waypoint());
     if (goal.orientation())
-      ImGui::Text("Goal orientation: %f", goal.orientation());
+      ImGui::Text("Goal orientation: %f", *goal.orientation());
     else
       ImGui::Text("No chosen goal orientation");
     ImGui::TreePop();
   }
   ImGui::Separator();
 
-  ImGui::TextColored(ImVec4(0, 1, 0, 1), "AStar plan generation", steps);
+  ImGui::TextColored(ImVec4(0, 1, 0, 1), "AStar plan generation");
   ImGui::TextColored(ImVec4(0, 1, 0, 1), "Steps taken: %d", steps);
   if (ImGui::Button("Step forward"))
   {
@@ -143,7 +143,7 @@ void do_planner_debug(
       progress = debug.begin(starts, goal, planner.get_default_options());
 
       current_plan.reset();
-      for (uint i=0; i<steps_jump; ++i)
+      for (int i=0; i<steps_jump; ++i)
         current_plan = progress.step();
       steps = steps_jump;
     }
@@ -159,7 +159,7 @@ void do_planner_debug(
     auto searchqueue = progress.queue();
     auto& container = get_priority_queue_container(searchqueue);
 
-    ImGui::TextColored(ImVec4(0, 1, 0, 1), "AStar Node Count: %d", container.size());
+    ImGui::TextColored(ImVec4(0, 1, 0, 1), "AStar Node Count: %lu", container.size());
     ImGui::NewLine();
 
     if (ImGui::ListBoxHeader("AStar Nodes"))
@@ -178,21 +178,22 @@ void do_planner_debug(
     
     ImGui::NewLine();
     ImGui::Separator();
-    if (selected_node_idx != -1 && selected_node_idx < container.size())
+    if (selected_node_idx != -1 && selected_node_idx < (int)container.size())
     {
       ImGui::TextColored(ImVec4(0, 1, 0, 1), "Node #%d Inspection", selected_node_idx);
       auto selected_node = container[selected_node_idx];
       ImGui::Text("Current Cost: %f", selected_node->current_cost);
       ImGui::Text("Remaining Cost Estimate: %f", selected_node->remaining_cost_estimate);
-      ImGui::Text("Waypoint: %d", selected_node->waypoint);
+      if (selected_node->waypoint)
+        ImGui::Text("Waypoint: %lu", *selected_node->waypoint);
       if (selected_node->start_set_index)
-        ImGui::Text("start_set_index: %d", *selected_node->start_set_index);
+        ImGui::Text("start_set_index: %lu", *selected_node->start_set_index);
       
       const rmf_traffic::Route& route = selected_node->route_from_parent;
       if (route.trajectory().start_time())
-        ImGui::Text("Node Traj start time: %llu",  route.trajectory().start_time()->time_since_epoch());
+        ImGui::Text("Node Traj start time: %ld",  route.trajectory().start_time()->time_since_epoch().count());
       if (route.trajectory().finish_time())
-        ImGui::Text("Node Traj finish time: %llu", route.trajectory().finish_time()->time_since_epoch());
+        ImGui::Text("Node Traj finish time: %ld", route.trajectory().finish_time()->time_since_epoch().count());
       ImGui::Text("Node Traj duration: %f", rmf_traffic::time::to_seconds(route.trajectory().duration()));
 
       ImGui::NewLine();
@@ -237,7 +238,7 @@ void do_planner_debug(
       }
       ImGui::Text("Parent count: %d", parent_count);
       parent_waypoint_str += "]";
-      ImGui::Text(parent_waypoint_str.c_str());
+      ImGui::Text("%s", parent_waypoint_str.c_str());
 
       if (timeline_duration > max_duration)
         timeline_duration = max_duration;

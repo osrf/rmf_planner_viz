@@ -25,7 +25,6 @@
 #include <SFML/Graphics/Text.hpp>
 
 #include <unordered_set>
-#include <optional>
 #include <iostream>
 
 namespace rmf_planner_viz {
@@ -184,7 +183,6 @@ public:
         w0_shape.setPosition(p0.x(), p0.y());
         w0_shape.setFillColor(WaypointColor);
         map_data.waypoints.emplace_back(std::move(w0_shape));
-
         map_data.waypoint_p.push_back({p0.x(), p0.y()});
         map_data.waypoint_indices.push_back(j0);
       }
@@ -196,7 +194,6 @@ public:
         w1_shape.setPosition(p1.x(), p1.y());
         w1_shape.setFillColor(WaypointColor);
         map_data.waypoints.emplace_back(std::move(w1_shape));
-
         map_data.waypoint_p.push_back({p1.x(), p1.y()});
         map_data.waypoint_indices.push_back(j1);
       }
