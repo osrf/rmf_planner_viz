@@ -206,7 +206,6 @@ int main()
   rmf_traffic::agv::Planner::Debug::Progress progress =
     planner_debug.begin(starts, goal, planner_0.get_default_options());
 
-  //rmf_traffic::agv::Planner::Progress planner_dbg_0(planner_0);
   rmf_planner_viz::draw::Schedule schedule_drawable(
         database, 0.25, test_map_name, now);
 
