@@ -36,7 +36,7 @@
 int main()
 {
   sf::Font font;
-  if (!font.loadFromFile("./build/rmf_planner_viz/fonts/Ubuntu-B.ttf"))
+  if (!font.loadFromFile("./build/rmf_planner_viz/fonts/OpenSans-Bold.ttf"))
   {
     std::cout << "Failed to load font. Make sure you run the executable from the colcon directory" << std::endl;
     return -1;

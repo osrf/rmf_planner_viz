@@ -54,4 +54,4 @@ void do_planner_debug(
   bool& show_node_trajectories,
   std::vector<rmf_planner_viz::draw::Trajectory>& trajectories_to_render);
 
-#endif
+#endif // RMF_PLANNER_VIZ__DRAW__PLANNERDEBUG_HPP
