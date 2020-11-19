@@ -22,6 +22,7 @@
 
 #include <SFML/Graphics/CircleShape.hpp>
 #include <SFML/Graphics/RenderTarget.hpp>
+#include <SFML/Graphics/Text.hpp>
 
 #include <unordered_set>
 #include <iostream>
@@ -38,11 +39,14 @@ public:
   {
     std::vector<Capsule> bi_lanes;
     std::vector<std::size_t> bi_indices;
+    std::vector<sf::VertexArray> bi_lane_arrows;
 
     std::vector<Capsule> mono_lanes;
     std::vector<std::size_t> mono_indices;
+    std::vector<sf::VertexArray> mono_lane_arrows;
 
     std::vector<sf::CircleShape> waypoints;
+    std::vector<sf::Text> waypoints_text;
     std::vector<Eigen::Vector2f> waypoint_p;
     std::vector<std::size_t> waypoint_indices;
   };
@@ -75,11 +79,37 @@ public:
 
   Implementation(
       const rmf_traffic::agv::Graph& graph,
-      const float lane_width)
+      const float lane_width,
+      const sf::Font& font)
   {
     this->lane_width = lane_width;
     std::unordered_map<std::size_t, std::unordered_set<std::size_t>> used_lanes;
     std::unordered_set<std::size_t> used_vertices;
+
+    for (std::size_t i=0; i < graph.num_waypoints(); ++i)
+    {
+      const auto& waypoint = graph.get_waypoint(i);
+      sf::Text text;
+      text.setFont(font);
+      if (waypoint.name())
+      {
+        std::string name = *waypoint.name();
+        name += " (";
+        name += std::to_string(waypoint.index());
+        name += ")";
+        text.setString(name);
+      }
+      else
+        text.setString(std::to_string(waypoint.index()));
+      text.setPosition(waypoint.get_location().x(), waypoint.get_location().y());
+
+      //minor scale hack
+      text.setScale(sf::Vector2f(1.f/40.f, -1.f/40.f));
+      text.setFillColor(sf::Color::Cyan);
+
+      auto& map_data = data[waypoint.get_map_name()];
+      map_data.waypoints_text.emplace_back(text);
+    }
 
     for (std::size_t i=0; i < graph.num_lanes(); ++i)
     {
@@ -139,11 +169,13 @@ public:
       {
         map_data.bi_lanes.push_back(std::move(capsule));
         map_data.bi_indices.push_back(i);
+        map_data.bi_lane_arrows.push_back(add_lane_arrow(v0, v1, true));
       }
       else
       {
         map_data.mono_lanes.push_back(std::move(capsule));
         map_data.mono_indices.push_back(i);
+        map_data.bi_lane_arrows.push_back(add_lane_arrow(v0, v1, false));
       }
 
       const float r_wp = waypoint_radius();
@@ -243,6 +275,47 @@ public:
       }
     }
   }
+
+  sf::VertexArray add_lane_arrow(const sf::Vertex& v0, const sf::Vertex& v1, bool include_backward)
+  {
+    sf::VertexArray arr(sf::Triangles);
+    sf::Vertex v;
+    v.color = sf::Color::Red;
+
+    // center
+    sf::Vector2 center = (v0.position + v1.position) * 0.5f;
+    sf::Vector2 diff = v1.position - v0.position;
+    float lengthsq = diff.x * diff.x + diff.y * diff.y;
+    float length = sqrt(lengthsq);
+    auto diff_norm = diff / length;
+
+    float center_spacing = 0.0625f;
+    sf::Vector2 backward_vec = diff_norm * (-0.5f - center_spacing);
+    sf::Vector2 forward_vec = diff_norm * (0.5f + center_spacing);
+    
+    auto diff_perp = sf::Vector2(-diff_norm.y, diff_norm.x);
+    float side = 0.25f;
+
+    v.position = center + diff_perp * -side + center_spacing * diff_norm;
+    arr.append(v);
+    v.position = center + diff_perp * side + center_spacing * diff_norm;
+    arr.append(v);
+    v.position = center + forward_vec;
+    arr.append(v);
+
+    if (include_backward)
+    {
+      v.color = sf::Color::Green;
+      v.position = center + diff_perp * -side - center_spacing * diff_norm;
+      arr.append(v);
+      v.position = center + backward_vec;
+      arr.append(v);
+      v.position = center + diff_perp * side - center_spacing * diff_norm;
+      arr.append(v);
+    }
+
+    return arr;
+  };
 };
 
 const sf::Color Graph::Implementation::LaneEntryColor = sf::Color::White;
@@ -252,8 +325,9 @@ const sf::Color Graph::Implementation::WaypointColor = sf::Color::Blue;
 //==============================================================================
 Graph::Graph(
     const rmf_traffic::agv::Graph& graph,
-    const float lane_width)
-  : _pimpl(rmf_utils::make_impl<Implementation>(graph, lane_width))
+    const float lane_width,
+    const sf::Font& font)
+  : _pimpl(rmf_utils::make_impl<Implementation>(graph, lane_width, font))
 {
   // Do nothing
 }
@@ -387,7 +461,13 @@ void Graph::draw(sf::RenderTarget& target, sf::RenderStates states) const
   for (const auto& s : map_data.bi_lanes)
     target.draw(s, states);
 
+  for (const auto& s : map_data.bi_lane_arrows)
+    target.draw(s, states);
+
   for (const auto& s : map_data.waypoints)
+    target.draw(s, states);
+
+  for (const auto& s : map_data.waypoints_text)
     target.draw(s, states);
 }
 

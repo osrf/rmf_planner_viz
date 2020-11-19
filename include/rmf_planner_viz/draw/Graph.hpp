@@ -23,6 +23,7 @@
 #include <SFML/Graphics/Drawable.hpp>
 #include <SFML/Graphics/Shape.hpp>
 #include <SFML/Graphics/Vertex.hpp>
+#include <SFML/Graphics/Font.hpp>
 
 #include <rmf_utils/optional.hpp>
 
@@ -36,7 +37,7 @@ class Graph : public sf::Drawable
 {
 public:
 
-  Graph(const rmf_traffic::agv::Graph& graph, float lane_width);
+  Graph(const rmf_traffic::agv::Graph& graph, float lane_width, const sf::Font& font);
 
   bool choose_map(const std::string& name);
 

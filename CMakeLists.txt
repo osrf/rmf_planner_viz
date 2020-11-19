@@ -43,7 +43,7 @@ target_include_directories(
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 
-add_executable(simple_test test/simple_test.cpp)
+add_executable(simple_test test/simple_test.cpp test/planner_debug.cpp)
 target_link_libraries(
   simple_test
   PUBLIC
@@ -102,4 +102,10 @@ if(fcl_FOUND)
       fcl
   )
 endif()
+
+## copy font files
+install(
+  DIRECTORY fonts/
+  DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/fonts/
+)
 

@@ -23,15 +23,25 @@
 #include <rmf_planner_viz/draw/Graph.hpp>
 #include <rmf_planner_viz/draw/Schedule.hpp>
 #include <rmf_planner_viz/draw/IMDraw.hpp>
+#include <rmf_planner_viz/draw/Trajectory.hpp>
 
 #include <rmf_traffic/schedule/Database.hpp>
 #include <rmf_traffic/agv/Planner.hpp>
+#include <rmf_traffic/agv/debug/Planner.hpp>
 #include <rmf_traffic/geometry/Circle.hpp>
 
 #include "imgui-SFML.h"
+#include "planner_debug.hpp"
 
 int main()
 {
+  sf::Font font;
+  if (!font.loadFromFile("./build/rmf_planner_viz/fonts/OpenSans-Bold.ttf"))
+  {
+    std::cout << "Failed to load font. Make sure you run the executable from the colcon directory" << std::endl;
+    return -1;
+  }
+  
   const rmf_traffic::Profile profile{
     rmf_traffic::geometry::make_final_convex<
       rmf_traffic::geometry::Circle>(1.0)
@@ -58,6 +68,7 @@ int main()
   graph_0.add_waypoint(test_map_name, {0.0, 10.0}); // 10
   graph_0.add_waypoint(test_map_name, {5.0, 10.0}); // 11
   graph_0.add_waypoint(test_map_name, {-12.0, 10.0}); // 12
+  graph_0.add_key("Interesting Waypoint", 0);
 
   /*            0<------------1<------------2
    *                                        ^
@@ -99,7 +110,7 @@ int main()
   graph_0.add_lane(11, 9);
   graph_0.add_lane(12, 10);
 
-  rmf_planner_viz::draw::Graph graph_0_drawable(graph_0, 1.0);
+  rmf_planner_viz::draw::Graph graph_0_drawable(graph_0, 1.0, font);
 
   rmf_traffic::agv::Graph graph_1;
   graph_1.add_waypoint(test_map_name, {-5.0, 15.0}); // 0
@@ -110,7 +121,7 @@ int main()
   graph_1.add_lane(2, 1);
   graph_1.add_lane(3, 2);
 
-  rmf_planner_viz::draw::Graph graph_1_drawable(graph_1, 0.5);
+  rmf_planner_viz::draw::Graph graph_1_drawable(graph_1, 0.5, font);
 
   std::shared_ptr<rmf_traffic::schedule::Database> database =
       std::make_shared<rmf_traffic::schedule::Database>();
@@ -119,6 +130,7 @@ int main()
         rmf_traffic::agv::Planner::Configuration(graph_0, traits),
         rmf_traffic::agv::Planner::Options(nullptr));
 
+  /// Setup participants
   auto p0 = rmf_traffic::schedule::make_participant(
         rmf_traffic::schedule::ParticipantDescription{
           "participant_0",
@@ -128,9 +140,6 @@ int main()
         },
         database);
 
-  const auto now = std::chrono::steady_clock::now();
-  p0.set(planner_0.plan({now, 11, 0.0}, 3)->get_itinerary());
-
   auto p1 = rmf_traffic::schedule::make_participant(
         rmf_traffic::schedule::ParticipantDescription{
           "participant_1",
@@ -139,8 +148,6 @@ int main()
           profile
         },
         database);
-
-  p1.set(planner_0.plan({now, 12, 0.0}, 2)->get_itinerary());
 
   auto pa = rmf_traffic::schedule::make_participant(
         rmf_traffic::schedule::ParticipantDescription{
@@ -178,11 +185,26 @@ int main()
         },
         database);
 
-  p2.set(planner_0.plan(
-    {now, 10, 0.0}, 7,
-    rmf_traffic::agv::Plan::Options(
-    rmf_traffic::agv::ScheduleRouteValidator::make(
-        database, p2.id(), p2.description().profile())))->get_itinerary());
+
+  // set plans for the participants
+  const auto now = std::chrono::steady_clock::now();
+
+  std::vector<rmf_traffic::agv::Planner::Start> starts;
+  starts.emplace_back(now, 11, 0.0);
+  // starts.emplace_back(now, 12, 0.0);
+  // starts.emplace_back(now, 10, 0.0);
+
+  // p0.set(planner_0.plan(starts[0], 3)->get_itinerary());
+  // p1.set(planner_0.plan(starts[1], 2)->get_itinerary());
+  // p2.set(planner_0.plan(starts[2], 7,
+  //   rmf_traffic::agv::Plan::Options(
+  //   rmf_traffic::agv::ScheduleRouteValidator::make(
+  //       database, p2.id(), p2.description().profile())))->get_itinerary());
+
+  rmf_traffic::agv::Planner::Goal goal(3);
+  rmf_traffic::agv::Planner::Debug planner_debug(planner_0);
+  rmf_traffic::agv::Planner::Debug::Progress progress =
+    planner_debug.begin(starts, goal, planner_0.get_default_options());
 
   rmf_planner_viz::draw::Schedule schedule_drawable(
         database, 0.25, test_map_name, now);
@@ -231,18 +253,14 @@ int main()
     }
 
     ImGui::SFML::Update(app_window, deltaClock.restart());
-
-    static bool demo_control = true;
-    static float demo_color[4] = { 1.f, 1.f, 1.f, 1.f};
-    ImGui::SetWindowSize(ImVec2(600, 200));
     
-    ImGui::Begin("Demo control panel", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
-    ImGui::TextColored(ImVec4(0, 1, 0, 1), "Demo control panel");
-    ImGui::Checkbox("demo_control", &demo_control);
-    ImGui::ColorPicker4("colorpicker", demo_color);
-    ImGui::End();
-    
+    static bool show_node_trajectories = true;
+    static std::vector<rmf_planner_viz::draw::Trajectory> trajectories_to_render;
 
+    rmf_planner_viz::draw::do_planner_debug(
+      profile, planner_0, starts, goal, planner_debug, progress, now,
+      show_node_trajectories, trajectories_to_render);
+    
     ImGui::EndFrame();
 
     /*** drawing ***/
@@ -255,13 +273,14 @@ int main()
     app_window.draw(graph_0_drawable, states);
     app_window.draw(graph_1_drawable, states);
     app_window.draw(schedule_drawable, states);
-
+    if (show_node_trajectories)
     {
-      sf::Transformable vqs;
-      vqs.setScale(1.f, -1.f);
-      auto tx_flipped_2d = vqs.getTransform();
-      rmf_planner_viz::draw::IMDraw::flush_and_render(app_window, tx_flipped_2d);
+      for (const auto& trajectory : trajectories_to_render)
+        app_window.draw(trajectory, states);
     }
+
+    rmf_planner_viz::draw::IMDraw::flush_and_render(app_window, states.transform);
+    
 
     ImGui::SFML::Render(app_window);
     app_window.display();

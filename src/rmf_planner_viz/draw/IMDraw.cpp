@@ -55,7 +55,7 @@ void IMDraw::draw_circle(const sf::Vector2f& center, double radius, const sf::Co
 }
 
 
-void IMDraw::draw_axis()
+void IMDraw::draw_axis(float size)
 {
   if (g_vertexarrays.size() >= VERTEX_ARRAYS_LIMIT)
   {
@@ -63,55 +63,8 @@ void IMDraw::draw_axis()
     return;
   }
 
-  // x-axis + arrowhead
-  {
-    sf::VertexArray arr(sf::Lines);
-    sf::Vertex v;
-    v.color = sf::Color(255, 0, 0, 255);
-
-    v.position = sf::Vector2f(0, 0);
-    arr.append(v);
-
-    v.position = sf::Vector2f(1, 0);
-    arr.append(v);
-
-    float cap_x = 0.85f;
-    v.position = sf::Vector2f(1, 0);
-    arr.append(v);
-    v.position = sf::Vector2f(cap_x, 0.15f);
-    arr.append(v);
-
-    v.position = sf::Vector2f(1, 0);
-    arr.append(v);
-    v.position = sf::Vector2f(cap_x, -0.15f);
-    arr.append(v);
-
-    g_vertexarrays.push_back(arr);
-  }
-  // y-axis + arrowhead
-  {
-    sf::VertexArray arr(sf::Lines);
-    sf::Vertex v;
-    v.color = sf::Color(0, 255, 0, 255);
-
-    v.position = sf::Vector2f(0, 0);
-    arr.append(v);
-
-    v.position = sf::Vector2f(0, 1);
-    arr.append(v);
-
-    float cap_y = 0.85f;
-    v.position = sf::Vector2f(0, 1);
-    arr.append(v);
-    v.position = sf::Vector2f(0.15f, cap_y);
-    arr.append(v);
-
-    v.position = sf::Vector2f(0, 1);
-    arr.append(v);
-    v.position = sf::Vector2f(-0.15f, cap_y);
-    arr.append(v);
-    g_vertexarrays.push_back(arr);
-  }
+  draw_arrow(sf::Vector2f(0,0), sf::Vector2f(size, 0), sf::Color::Red);
+  draw_arrow(sf::Vector2f(0,0), sf::Vector2f(0, size), sf::Color::Green);
 }
 
 void IMDraw::draw_trajectory(const rmf_traffic::Trajectory& trajectory, const sf::Color& color)
