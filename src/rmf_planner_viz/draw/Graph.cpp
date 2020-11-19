@@ -169,13 +169,12 @@ public:
       {
         map_data.bi_lanes.push_back(std::move(capsule));
         map_data.bi_indices.push_back(i);
-        map_data.bi_lane_arrows.push_back(add_lane_arrow(v0, v1, true));
       }
       else
       {
         map_data.mono_lanes.push_back(std::move(capsule));
         map_data.mono_indices.push_back(i);
-        map_data.bi_lane_arrows.push_back(add_lane_arrow(v0, v1, false));
+        map_data.bi_lane_arrows.push_back(add_lane_arrow(v0, v1));
       }
 
       const float r_wp = waypoint_radius();
@@ -276,7 +275,7 @@ public:
     }
   }
 
-  sf::VertexArray add_lane_arrow(const sf::Vertex& v0, const sf::Vertex& v1, bool include_backward)
+  sf::VertexArray add_lane_arrow(const sf::Vertex& v0, const sf::Vertex& v1)
   {
     sf::VertexArray arr(sf::Triangles);
     sf::Vertex v;
@@ -290,7 +289,6 @@ public:
     auto diff_norm = diff / length;
 
     float center_spacing = 0.0625f;
-    sf::Vector2 backward_vec = diff_norm * (-0.5f - center_spacing);
     sf::Vector2 forward_vec = diff_norm * (0.5f + center_spacing);
     
     auto diff_perp = sf::Vector2(-diff_norm.y, diff_norm.x);
@@ -302,17 +300,6 @@ public:
     arr.append(v);
     v.position = center + forward_vec;
     arr.append(v);
-
-    if (include_backward)
-    {
-      v.color = sf::Color::Green;
-      v.position = center + diff_perp * -side - center_spacing * diff_norm;
-      arr.append(v);
-      v.position = center + backward_vec;
-      arr.append(v);
-      v.position = center + diff_perp * side - center_spacing * diff_norm;
-      arr.append(v);
-    }
 
     return arr;
   };
