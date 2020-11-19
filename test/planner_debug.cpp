@@ -28,6 +28,9 @@
 
 #include "imgui-SFML.h"
 
+namespace rmf_planner_viz {
+namespace draw {
+
 void do_planner_debug(
   const rmf_traffic::Profile& profile, 
   rmf_traffic::agv::Planner& planner,
@@ -35,7 +38,7 @@ void do_planner_debug(
   rmf_traffic::agv::Planner::Goal& goal,
   rmf_traffic::agv::Planner::Debug& debug,
   rmf_traffic::agv::Planner::Debug::Progress& progress,
-  const std::chrono::steady_clock::time_point& start_timing,
+  const std::chrono::steady_clock::time_point& plan_start_timing,
   bool& show_node_trajectories,
   std::vector<rmf_planner_viz::draw::Trajectory>& trajectories_to_render)
 {
@@ -53,28 +56,29 @@ void do_planner_debug(
 
   ImGui::Separator();
   
-  // presets
+  /// Presets, edit you plans here as you please
   if (ImGui::TreeNode("Presets"))
   {
     bool preset_triggered = false;
     if (ImGui::Button("Preset #0"))
     {
       starts.clear();
-      starts.emplace_back(start_timing, 11, 0.0);
+      starts.emplace_back(plan_start_timing, 11, 0.0);
       goal = rmf_traffic::agv::Planner::Goal(3);
       preset_triggered = true;
     }
     if (ImGui::Button("Preset #1"))
     {
       starts.clear();
-      starts.emplace_back(start_timing, 10, 0.0);
+      starts.emplace_back(plan_start_timing, 10, 0.0);
       goal = rmf_traffic::agv::Planner::Goal(3);
       preset_triggered = true;
     }
     if (ImGui::Button("Preset #2"))
     {
       starts.clear();
-      starts.emplace_back(start_timing, 9, 0.0);
+      starts.emplace_back(plan_start_timing, 9, 0.0);
+      starts.emplace_back(plan_start_timing, 11, 0.0);
       goal = rmf_traffic::agv::Planner::Goal(3);
       preset_triggered = true;
     }
@@ -90,6 +94,7 @@ void do_planner_debug(
   
   ImGui::Separator();
 
+  /// Current plan details
   if (ImGui::TreeNode("Current Plan"))
   {
     ImGui::Text("Starts: ");
@@ -112,6 +117,7 @@ void do_planner_debug(
   }
   ImGui::Separator();
 
+  /// AStar plan control
   ImGui::TextColored(ImVec4(0, 1, 0, 1), "AStar plan generation");
   ImGui::TextColored(ImVec4(0, 1, 0, 1), "Steps taken: %d", steps);
   if (ImGui::Button("Step forward"))
@@ -153,7 +159,7 @@ void do_planner_debug(
   ImGui::Separator();
 
   trajectories_to_render.clear();
-  
+  /// AStar Node details  
   if (current_plan)
   {      
     auto searchqueue = progress.queue();
@@ -230,17 +236,17 @@ void do_planner_debug(
       static bool render_parent_trajectories = false;
       ImGui::Checkbox("Render Parent Trajectories", &render_parent_trajectories);
 
-      auto trajectory_time = rmf_traffic::time::apply_offset(
-        start_timing, timeline_control_value);
+      auto trajectory_start_time = rmf_traffic::time::apply_offset(
+        plan_start_timing, timeline_control_value);
         
-      auto add_trajectory_to_render = [trajectory_time, &profile](
+      auto add_trajectory_to_render = [trajectory_start_time, &profile](
         std::vector<rmf_planner_viz::draw::Trajectory>& to_render,
         rmf_traffic::agv::Planner::Debug::ConstNodePtr node)
       {
         const rmf_traffic::Route& route = node->route_from_parent;
         const auto& traj = route.trajectory();
         auto trajectory = rmf_planner_viz::draw::Trajectory(traj, 
-          profile, trajectory_time, std::nullopt, sf::Color::Green, { 0.0, 0.0 }, 0.5f);
+          profile, trajectory_start_time, std::nullopt, sf::Color::Green, { 0.0, 0.0 }, 0.5f);
         to_render.push_back(trajectory);
       };
       add_trajectory_to_render(trajectories_to_render, selected_node);
@@ -261,12 +267,13 @@ void do_planner_debug(
         timeline_control_value = max_duration;
       ImGui::SliderFloat("Timeline Control", &timeline_control_value, 0.0f, max_duration);
     }
-    else
-      trajectories_to_render.clear();
   }
   else
     ImGui::TextColored(ImVec4(0, 1, 0, 1), "Current plan not available");
 
   ImGui::End();
-
 }
+
+
+} // namespace draw
+} // namespace rmf_planner_viz

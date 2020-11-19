@@ -26,6 +26,9 @@
 
 #include <queue>
 
+namespace rmf_planner_viz {
+namespace draw {
+
 // Hacky method to access the underlying container of std::priority_queue
 // normally we'll derive off std::priority_queue and add a get_container function
 // but this will suffice for the debugger's purposes
@@ -50,8 +53,11 @@ void do_planner_debug(
   rmf_traffic::agv::Planner::Goal& goal,
   rmf_traffic::agv::Planner::Debug& debug,
   rmf_traffic::agv::Planner::Debug::Progress& progress,
-  const std::chrono::steady_clock::time_point& start_timing,
+  const std::chrono::steady_clock::time_point& plan_start_timing, // earliest time the timeline starts from
   bool& show_node_trajectories,
   std::vector<rmf_planner_viz::draw::Trajectory>& trajectories_to_render);
+
+} // namespace draw
+} // namespace rmf_planner_viz
 
 #endif // RMF_PLANNER_VIZ__DRAW__PLANNERDEBUG_HPP

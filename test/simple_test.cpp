@@ -257,12 +257,11 @@ int main()
     static bool show_node_trajectories = true;
     static std::vector<rmf_planner_viz::draw::Trajectory> trajectories_to_render;
 
-    do_planner_debug(profile, planner_0, starts, goal, planner_debug, progress, now,
+    rmf_planner_viz::draw::do_planner_debug(
+      profile, planner_0, starts, goal, planner_debug, progress, now,
       show_node_trajectories, trajectories_to_render);
     
     ImGui::EndFrame();
-
-    //rmf_planner_viz::draw::IMDraw::draw_axis();
 
     /*** drawing ***/
     app_window.clear();
