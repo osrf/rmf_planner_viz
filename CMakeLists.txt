@@ -109,6 +109,17 @@ if(fcl_FOUND)
       ImGui-SFML::ImGui-SFML
       fcl
   )
+
+  add_executable(test_sidecar
+    test/test_sidecar.cpp
+    test/spline_offset_utils.cpp
+  )
+
+  target_link_libraries(test_sidecar
+    rmf_planning_viz
+    ImGui-SFML::ImGui-SFML
+    fcl
+  )
 endif()
 
 ## copy font files
