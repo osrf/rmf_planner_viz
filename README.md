@@ -16,6 +16,14 @@ Then you can start running interactive tests in the `./build/rmf_planner_viz/` d
 
 ----
 
+Test Programs:
+- simple_test: Visual AStar planner debugger
+- test_trajectory, test_spline: spline testing utilitis
+- test_fcl_spline: spline drawing using fcl SplineMotion parameters
+- test_fcl_spline_offset: Sidecar collision test using modified ccd algorithm to account for an offset transform, Experimental.
+- test_sidecar: Triangle mesh ccd solution for sidecar. Experimental.
+
+--
 Optionally, you can build and run test_fcl_spline by cloning 
 
 https://github.com/ddengster/fcl.git with branch 0.6.1-fix-conservative-adv into your workspace
