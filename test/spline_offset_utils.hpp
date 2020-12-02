@@ -37,6 +37,13 @@ std::array<Eigen::Vector3d, 4> compute_knots(
   Eigen::Vector3d v0,
   Eigen::Vector3d v1);
 
+fcl::SplineMotion<double> convert_catmullrom_to_bspline(
+  Eigen::Vector3d p0,
+  Eigen::Vector3d p1,
+  Eigen::Vector3d p2,
+  Eigen::Vector3d p3,
+  bool show_control_poly);
+
 template <typename Shape1, typename Shape2, typename NarrowPhaseSolver>
 bool conservativeAdvancementWithOffset(
     const Shape1& o1, const fcl::MotionBase<typename Shape1::S>* motion1, const fcl::Transform3d& offset_o1,

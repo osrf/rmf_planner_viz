@@ -16,6 +16,9 @@
 */
 
 #include "spline_offset_utils.hpp"
+#include <SFML/Graphics.hpp>
+
+#include <rmf_planner_viz/draw/IMDraw.hpp>
 
 namespace rmf_planner_viz {
 namespace draw {
@@ -72,6 +75,66 @@ std::array<Eigen::Vector3d, 4> compute_knots(
   }
 
   return result;
+}
+
+fcl::SplineMotion<double> convert_catmullrom_to_bspline(
+  Eigen::Vector3d p0,
+  Eigen::Vector3d p1,
+  Eigen::Vector3d p2,
+  Eigen::Vector3d p3,
+  bool show_control_poly)
+{
+  // @reference:
+  // https://computergraphics.stackexchange.com/questions/8267/conversion-from-cubic-catmull-rom-spline-to-cubic-b-spline
+  // the topright and botleft values of the final matrix are wrong, should be negative
+
+  Eigen::Matrix4d mtx_catmullrom;
+  mtx_catmullrom << 
+    -1.0,  3.0, -3.0,  1.0,
+      2.0, -5.0,  4.0, -1.0,
+    -1.0,  0.0,  1.0,  0.0,
+      0.0,  2.0,  0.0,  0.0;
+  mtx_catmullrom *= 0.5;
+
+  Eigen::Matrix4d mtx_bspline;
+  mtx_bspline << 
+    -1.0,  3.0, -3.0,  1.0,
+      3.0, -6.0,  3.0,  0.0,
+    -3.0,  0.0,  3.0,  0.0,
+      1.0,  4.0,  1.0,  0.0;
+  mtx_bspline /= 6.0;
+  Eigen::Matrix4d mtx_bspline_inv = mtx_bspline.inverse();
+
+  Eigen::Matrix<double, 4, 3> input;
+  input << 
+    p0[0], p0[1], p0[2],
+    p1[0], p1[1], p1[2],
+    p2[0], p2[1], p2[2],
+    p3[0], p3[1], p3[2];
+
+  auto result = mtx_bspline_inv * mtx_catmullrom * input; // 4x3 matrix
+  Eigen::Vector3d bspline_p0(result(0, 0), result(0, 1), result(0, 2));
+  Eigen::Vector3d bspline_p1(result(1, 0), result(1, 1), result(1, 2));
+  Eigen::Vector3d bspline_p2(result(2, 0), result(2, 1), result(2, 2));
+  Eigen::Vector3d bspline_p3(result(3, 0), result(3, 1), result(3, 2));
+
+  if (show_control_poly)
+  {
+    IMDraw::draw_circle(sf::Vector2f(bspline_p0.x(), bspline_p0.y()), 0.0625f, sf::Color(128,128,128));
+    IMDraw::draw_circle(sf::Vector2f(bspline_p1.x(), bspline_p1.y()), 0.0625f, sf::Color(128,128,128));
+    IMDraw::draw_circle(sf::Vector2f(bspline_p2.x(), bspline_p2.y()), 0.0625f, sf::Color(128,128,128));
+    IMDraw::draw_circle(sf::Vector2f(bspline_p3.x(), bspline_p3.y()), 0.0625f, sf::Color(128,128,128));
+
+    IMDraw::draw_line(sf::Vector2f(bspline_p0.x(), bspline_p0.y()), sf::Vector2f(bspline_p1.x(), bspline_p1.y()), sf::Color(128,128,128));
+    IMDraw::draw_line(sf::Vector2f(bspline_p1.x(), bspline_p1.y()), sf::Vector2f(bspline_p2.x(), bspline_p2.y()), sf::Color(128,128,128));
+    IMDraw::draw_line(sf::Vector2f(bspline_p2.x(), bspline_p2.y()), sf::Vector2f(bspline_p3.x(), bspline_p3.y()), sf::Color(128,128,128));
+  }
+
+  const Eigen::Vector3d zero = Eigen::Vector3d(0,0,0);
+  return fcl::SplineMotion<double>(
+    bspline_p0, bspline_p1, bspline_p2, bspline_p3,
+    zero, zero, zero, zero);
+
 }
 
 } // namespace draw

@@ -250,6 +250,8 @@ int main()
         current_preset = 1;
       if (ImGui::Button("Preset #2"))
         current_preset = 2;
+      if (ImGui::Button("Preset #3"))
+        current_preset = 3;
       
       ImGui::Separator();
 
@@ -286,6 +288,19 @@ int main()
                         Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 0, 0));
 
         auto knots_b =
+            rmf_planner_viz::draw::compute_knots(Eigen::Vector3d(-5 - 0.15, 0, 0), Eigen::Vector3d(-2 + 0.15, 0, 3.0 * EIGEN_PI / 2.0),
+                          Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 0, 0));
+
+        motion_a = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_a));
+        motion_b = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_b));
+      }
+      else if (current_preset == 3)
+      {
+        auto knots_a =
+          rmf_planner_viz::draw::compute_knots(Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 0, 0),
+                        Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 0, 0));
+
+        auto knots_b =
             rmf_planner_viz::draw::compute_knots(Eigen::Vector3d(-5 - 0.15, 0, 0), Eigen::Vector3d(-2 + 0.15, 0, EIGEN_PI / 2.0),
                           Eigen::Vector3d(0, 16, 0), Eigen::Vector3d(0, -16, 0));
 
@@ -293,6 +308,8 @@ int main()
         motion_b = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_b));
       }
       
+      // Collision using the original spline and apply offset transform to each iteration
+      // of the gjk algorithm. (FAILING)
       {
         const auto obj_a = fcl::ContinuousCollisionObject<double>(shape_a, motion_a);
         const auto obj_b = fcl::ContinuousCollisionObject<double>(shape_b, motion_b);
@@ -336,7 +353,7 @@ int main()
         draw_offset_sidecar_on_spline(*motion_b, interp, circle_shape_ex->get_characteristic_length(), shape_b2_offset, sf::Color::Green);
       }
       
-      // approximated
+      // approximated b-spline via sampling points on motion, making a catmull rom and converting to bspline knots
       {
         const int steps = 3;
         const int point_count = steps + 1;
@@ -370,71 +387,22 @@ int main()
           draw_catmull_rom(points[0], points[1], points[2], points[3], sf::Color(128,128,128));
 
         static bool show_control_poly = false;
-        auto convert = [show_control_poly](Eigen::Vector3d p0, Eigen::Vector3d p1, Eigen::Vector3d p2, Eigen::Vector3d p3) -> fcl::SplineMotion<double> 
-        {
-          // @reference
-          // https://computergraphics.stackexchange.com/questions/8267/conversion-from-cubic-catmull-rom-spline-to-cubic-b-spline
-          // the topright and botleft values of the matrix is wrong, should be negative
 
-          Eigen::Matrix4d mtx_catmullrom;
-          mtx_catmullrom << 
-            -1.0,  3.0, -3.0,  1.0,
-             2.0, -5.0,  4.0, -1.0,
-            -1.0,  0.0,  1.0,  0.0,
-             0.0,  2.0,  0.0,  0.0;
-          mtx_catmullrom *= 0.5;
-
-          Eigen::Matrix4d mtx_bspline;
-          mtx_bspline << 
-            -1.0,  3.0, -3.0,  1.0,
-             3.0, -6.0,  3.0,  0.0,
-            -3.0,  0.0,  3.0,  0.0,
-             1.0,  4.0,  1.0,  0.0;
-          mtx_bspline /= 6.0;
-          Eigen::Matrix4d mtx_bspline_inv = mtx_bspline.inverse();
-
-          Eigen::Matrix<double, 4, 3> input;
-          input << 
-            p0[0], p0[1], p0[2],
-            p1[0], p1[1], p1[2],
-            p2[0], p2[1], p2[2],
-            p3[0], p3[1], p3[2];
-
-          auto result = mtx_bspline_inv * mtx_catmullrom * input; // 4x3 matrix
-          Eigen::Vector3d bspline_p0(result(0, 0), result(0, 1), result(0, 2));
-          Eigen::Vector3d bspline_p1(result(1, 0), result(1, 1), result(1, 2));
-          Eigen::Vector3d bspline_p2(result(2, 0), result(2, 1), result(2, 2));
-          Eigen::Vector3d bspline_p3(result(3, 0), result(3, 1), result(3, 2));
-
-          if (show_control_poly)
-          {
-            IMDraw::draw_circle(sf::Vector2f(bspline_p0.x(), bspline_p0.y()), 0.0625f, sf::Color(128,128,128));
-            IMDraw::draw_circle(sf::Vector2f(bspline_p1.x(), bspline_p1.y()), 0.0625f, sf::Color(128,128,128));
-            IMDraw::draw_circle(sf::Vector2f(bspline_p2.x(), bspline_p2.y()), 0.0625f, sf::Color(128,128,128));
-            IMDraw::draw_circle(sf::Vector2f(bspline_p3.x(), bspline_p3.y()), 0.0625f, sf::Color(128,128,128));
-
-            IMDraw::draw_line(sf::Vector2f(bspline_p0.x(), bspline_p0.y()), sf::Vector2f(bspline_p1.x(), bspline_p1.y()), sf::Color(128,128,128));
-            IMDraw::draw_line(sf::Vector2f(bspline_p1.x(), bspline_p1.y()), sf::Vector2f(bspline_p2.x(), bspline_p2.y()), sf::Color(128,128,128));
-            IMDraw::draw_line(sf::Vector2f(bspline_p2.x(), bspline_p2.y()), sf::Vector2f(bspline_p3.x(), bspline_p3.y()), sf::Color(128,128,128));
-          }
-
-          const Eigen::Vector3d zero = Eigen::Vector3d(0,0,0);
-          return fcl::SplineMotion<double>(
-            bspline_p0, bspline_p1, bspline_p2, bspline_p3,
-            zero, zero, zero, zero);
-        };
-
-        auto motion_b2_approximated = std::make_shared<fcl::SplineMotion<double>>(
-          convert(points[0], points[1], points[2], points[3]));
+        auto motion_b2_approx_middle = std::make_shared<fcl::SplineMotion<double>>(
+          convert_catmullrom_to_bspline(points[0], points[1], points[2], points[3], show_control_poly));
 
         static bool show_fcl_sidecar_motion = true;
-        ImGui::Checkbox("Show fcl sidecar motion", &show_fcl_sidecar_motion);
+        ImGui::Checkbox("Show computed fcl sidecar motion", &show_fcl_sidecar_motion);
         if (show_fcl_sidecar_motion)
-          draw_fcl_splinemotion(*motion_b2_approximated, sf::Color::White);
+          draw_fcl_splinemotion(*motion_b2_approx_middle, sf::Color::White);
 
         ImGui::Checkbox("Show control polygon", &show_control_poly);
 
         ImGui::Separator();
+        
+        auto fcl_collide = [&](
+          const std::shared_ptr<fcl::SplineMotion<double>>& ma, 
+          const std::shared_ptr<fcl::SplineMotion<double>>& mb) -> fcl::ContinuousCollisionResultd
         {
           fcl::ContinuousCollisionRequest<double> request;
           request.ccd_solver_type = fcl::CCDC_CONSERVATIVE_ADVANCEMENT;
@@ -442,17 +410,82 @@ int main()
           
           fcl::ContinuousCollisionResultd result;
           const auto obj_a = fcl::ContinuousCollisionObjectd(
-            shape_a, motion_a);
+            shape_a, ma);
           const auto obj_b = fcl::ContinuousCollisionObjectd(
-            shape_b2, motion_b2_approximated);
+            shape_b2, mb);
           fcl::collide(&obj_a, &obj_b, request, result);
 
-          ImGui::Text("fcl::collide with approximated sidecar spline results:");
-          if (result.is_collide)
-            ImGui::Text("Collide! TOI: %f", result.time_of_contact);
-          else
-            ImGui::Text("No collision");
-        }
+          return result;
+        };
+        auto result = fcl_collide(motion_a, motion_b2_approx_middle);
+        ImGui::Text("fcl::collide with motion_b2_middle results:");
+        if (result.is_collide)
+          ImGui::Text("Collide in motion_b2_middle! TOI: %f", result.time_of_contact);
+        else
+          ImGui::Text("No collision in motion_b2_approx_middle");
+
+        double multiplier = 0.00001;
+        auto compute_derivative_on_catmullrom_spline = [](
+          Eigen::Vector3d p0,
+          Eigen::Vector3d p1,
+          Eigen::Vector3d p2,
+          Eigen::Vector3d p3,
+          double t)
+        {
+          double t_sq = t * t;
+
+          Eigen::Vector3d v = (-p0 + p2) + 
+            2.0 * (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * t +
+            3.0 * (-p0 + 3.0 * p1 - 3.0 * p2 + p3) * t_sq;
+          v = 0.5 * v;
+          return v;
+        };
+        auto point_on_catmullrom_spline = [](
+          Eigen::Vector3d p0,
+          Eigen::Vector3d p1,
+          Eigen::Vector3d p2,
+          Eigen::Vector3d p3,
+          double t)
+        {
+          double t_sq = t * t;
+          double t_cube = t * t * t;
+
+          Eigen::Vector3d p = (2.0 * p1) + (-p0 + p2) * t + 
+            (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * t_sq +
+            (-p0 + 3.0 * p1 - 3.0 * p2 + p3) * t_cube;
+          p = 0.5 * p;
+          return p;
+        };
+        
+        // make spline segments for first and last portions, use them for collision
+
+        //auto v_first = compute_derivative_on_catmullrom_spline(points[0], points[1], points[2], points[3], -0.01);
+        //auto first_pt = points[0] + multiplier * v_first;
+        auto first_pt = point_on_catmullrom_spline(points[0], points[1], points[2], points[3], -0.1);
+        auto motion_b2_first = std::make_shared<fcl::SplineMotion<double>>(
+          convert_catmullrom_to_bspline(first_pt, points[0], points[1], points[2], false));
+        if (show_fcl_sidecar_motion)
+          draw_fcl_splinemotion(*motion_b2_first, sf::Color::White);
+
+        //auto v_last = compute_derivative_on_catmullrom_spline(points[0], points[1], points[2], points[3], 1.01);
+        //auto last_pt = points[3] + multiplier * v_last;
+        auto last_pt = point_on_catmullrom_spline(points[0], points[1], points[2], points[3], 1.1);
+        auto motion_b2_last = std::make_shared<fcl::SplineMotion<double>>(
+          convert_catmullrom_to_bspline(points[1], points[2], points[3], last_pt, false));
+        if (show_fcl_sidecar_motion)
+          draw_fcl_splinemotion(*motion_b2_last, sf::Color::White);
+
+        result = fcl_collide(motion_a, motion_b2_first);
+        if (result.is_collide)
+          ImGui::Text("Collide in motion_b2_first TOI: %f", result.time_of_contact);
+        else
+          ImGui::Text("No collision in motion_b2_first");
+
+        result = fcl_collide(motion_a, motion_b2_last);
+        if (result.is_collide)
+          ImGui::Text("Collide in motion_b2_last TOI: %f", result.time_of_contact);
+        else
+          ImGui::Text("No collision in motion_b2_last");
 
         ImGui::Separator();
       }
