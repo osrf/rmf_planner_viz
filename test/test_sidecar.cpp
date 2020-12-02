@@ -32,11 +32,12 @@
 #include <fcl/narrowphase/continuous_collision.h>
 #include <fcl/math/motion/spline_motion.h>
 #include <fcl/geometry/bvh/BVH_internal.h>
+#include <fcl/geometry/geometric_shape_to_BVH_model.h>
 
 #include "imgui-SFML.h"
 #include "spline_offset_utils.hpp"
 
-void draw_fcl_splinemotion(const fcl::SplineMotion<double>& motion, const sf::Color& color = sf::Color(255, 255, 255, 255))
+void draw_fcl_motion(fcl::MotionBase<double>* motion, const sf::Color& color = sf::Color(255, 255, 255, 255))
 {
   const uint steps = 100;
   double interp_per_step = 1.0f / (double)steps;
@@ -47,28 +48,28 @@ void draw_fcl_splinemotion(const fcl::SplineMotion<double>& motion, const sf::Co
     double interp = interp_per_step * (double)i;
     double interp_next = interp_per_step * (double)(i + 1);
     
-    motion.integrate(interp);
-    motion.getCurrentTransform(tf);
+    motion->integrate(interp);
+    motion->getCurrentTransform(tf);
 
     tf.linear();
     auto translate1 = tf.translation();    
-    motion.integrate(interp_next);
+    motion->integrate(interp_next);
 
-    motion.getCurrentTransform(tf2);
+    motion->getCurrentTransform(tf2);
     auto translate2 = tf2.translation();
     
     using namespace rmf_planner_viz::draw;
 
     IMDraw::draw_line(sf::Vector2f(translate1.x(), translate1.y()), sf::Vector2f(translate2.x(), translate2.y()), color);
   }
-  motion.integrate(0.0); //reset
+  motion->integrate(0.0); //reset
 }
 
-void draw_robot_on_spline(const fcl::SplineMotion<double>& motion, double interp, double radius, const sf::Color& color = sf::Color(255, 255, 255, 255))
+void draw_robot_on_spline(fcl::MotionBase<double>* motion, double interp, double radius, const sf::Color& color = sf::Color(255, 255, 255, 255))
 {
-  motion.integrate(interp);
+  motion->integrate(interp);
   fcl::Transform3d tf;
-  motion.getCurrentTransform(tf);
+  motion->getCurrentTransform(tf);
 
   auto pt = tf.translation();
   rmf_planner_viz::draw::IMDraw::draw_circle(sf::Vector2f(pt.x(), pt.y()), radius, color);
@@ -161,17 +162,19 @@ int main()
     vertices_out[2] = fcl::Vector3d(-0.5 * x_length,  0.5 * y_length, 0.0);
     vertices_out[3] = fcl::Vector3d( 0.5 * x_length,  0.5 * y_length, 0.0);
 
-    triangles_out.resize(2);
+    triangles_out.resize(1);
     triangles_out[0].set(0, 1, 2);
-    triangles_out[1].set(1, 3, 2);
+    //triangles_out[1].set(1, 3, 2);
 
     for(unsigned int i = 0; i < vertices_out.size(); ++i)
       vertices_out[i] = pose * vertices_out[i];
   };
 
-  shape_b_bvh->beginModel();
+  
   // add shape
   {
+#if 1
+    shape_b_bvh->beginModel();
     std::vector<fcl::Vector3d> vertices;
     std::vector<fcl::Triangle> triangle_indices;
     
@@ -188,8 +191,13 @@ int main()
     // r = shape_b_bvh->addSubModel(vertices, triangle_indices);
     // if (r != fcl::BVH_OK)
     //   printf("failed#2");
+    shape_b_bvh->endModel();
+#else
+    fcl::Transform3d ident;
+    ident.setIdentity();
+    int res = fcl::generateBVHModel(*shape_b_bvh, shape_b, ident, fcl::FinalizeModel::DO);
+#endif
   }
-  shape_b_bvh->endModel();
 
   sf::Clock deltaClock;
   while (app_window.isOpen())
@@ -222,15 +230,18 @@ int main()
       // ImGui::Text("knots_b[1]: %f %f %f", knots_b[1][0], knots_b[1][1], knots_b[1][2]);
       // ImGui::Text("knots_b[2]: %f %f %f", knots_b[2][0], knots_b[2][1], knots_b[2][2]);
       // ImGui::Text("knots_b[3]: %f %f %f", knots_b[3][0], knots_b[3][1], knots_b[3][2]);
-      std::shared_ptr<fcl::SplineMotion<double>> motion_a, motion_b;
-      static int current_preset = 0;
-      if (ImGui::Button("Preset #0"))
+      std::shared_ptr<fcl::MotionBase<double>> motion_a, motion_b;
+      static int current_preset = 2;
+      if (ImGui::Button("Preset #0 (SplineMotion)"))
         current_preset = 0;
-      if (ImGui::Button("Preset #1"))
+      if (ImGui::Button("Preset #1 (SplineMotion Arc)"))
         current_preset = 1;
+      if (ImGui::Button("Preset #2 (InterpMotion)"))
+        current_preset = 2;
       
       ImGui::Separator();
 
+      bool is_splinemotion = false;
       if (current_preset == 0)
       {
         auto knots_a =
@@ -243,6 +254,7 @@ int main()
 
         motion_a = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_a));
         motion_b = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_b));
+        is_splinemotion = true;
       }
       else if (current_preset == 1)
       {
@@ -256,10 +268,27 @@ int main()
 
         motion_a = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_a));
         motion_b = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_b));
+        is_splinemotion = true;
       }
+      else
+      {
+        fcl::Transform3<double> identity;
+        identity.setIdentity();
 
+        fcl::Transform3<double> b_start;
+        b_start.setIdentity();
+        b_start.translation() = fcl::Vector3d(-2, 0, 0);
+
+        fcl::Transform3<double> b_end;
+        b_end.setIdentity();
+        b_end.translation() = fcl::Vector3d(0, 0, 0);
+
+        motion_a = std::make_shared<fcl::InterpMotion<double>>(identity, identity);
+        motion_b = std::make_shared<fcl::InterpMotion<double>>(b_start, b_end);
+        is_splinemotion = false;
+      }
+      
       const auto obj_a = fcl::ContinuousCollisionObject<double>(shape_a, motion_a);
-      printf("asdasd");
       const auto obj_b = fcl::ContinuousCollisionObject<double>(shape_b_bvh, motion_b);
       
       fcl::ContinuousCollisionRequest<double> request;
@@ -270,29 +299,40 @@ int main()
       motion_a->integrate(0.0);
       motion_b->integrate(0.0);
 
-      // test for collision
-      fcl::Transform3d identity_offset;
-      identity_offset.setIdentity();
-      fcl::ContinuousCollisionResultd result;
-      fcl::collide(&obj_a, &obj_b, request, result);
-        
-      if (result.is_collide)
-        ImGui::Text("Collide! TOI: %f", result.time_of_contact);
-      else
-        ImGui::Text("No collision");
+      //if (is_splinemotion == false)
+      {
+        // test for collision
+        fcl::ContinuousCollisionResultd result;
+        fcl::collide(&obj_a, &obj_b, request, result);
 
-      // draw motions of both splines
-      draw_fcl_splinemotion(*motion_a, sf::Color::Red);
-      draw_fcl_splinemotion(*motion_b, sf::Color::Green);
+        if (result.is_collide)
+          ImGui::Text("Collide! TOI: %f", result.time_of_contact);
+        else
+          ImGui::Text("No collision");
+      }
+      /*else
+      {
+        ImGui::Text("SplineMotion with BVH collision results in infinate loop (25/11/2020)");
+      }*/
 
       // draw robot circle on motion
       static float interp = 0.0f;
       ImGui::InputFloat("interp", &interp, 0.01);
-
-      draw_robot_on_spline(*motion_a, interp, circle_shape->get_characteristic_length(), sf::Color::Red);
-      draw_robot_on_spline(*motion_b, interp, circle_shape->get_characteristic_length(), sf::Color::Green);
       
-      draw_offset_sidecar_on_spline(*motion_b, interp, circle_shape_ex->get_characteristic_length(), shape_b2_offset, sf::Color::Green);
+      // draw motions of both splines
+      {
+        draw_fcl_motion(motion_a.get(), sf::Color::Red);
+        draw_fcl_motion(motion_b.get(), sf::Color::Green);
+
+        draw_robot_on_spline(motion_a.get(), interp, circle_shape->get_characteristic_length(), sf::Color::Red);
+        draw_robot_on_spline(motion_b.get(), interp, circle_shape->get_characteristic_length(), sf::Color::Green);
+      }
+
+      
+
+      
+      
+      //draw_offset_sidecar_on_spline(*motion_b, interp, circle_shape_ex->get_characteristic_length(), shape_b2_offset, sf::Color::Green);
     }
     ImGui::End();
     ImGui::EndFrame();
