@@ -199,6 +199,7 @@ int main()
 #endif
   }
 
+  // interp motion parameters
   Eigen::Vector3d a_start(0,0,0), a_end(0,0,0);
   double a_rot_start = 0.0, a_rot_end = 0.0;
 
@@ -220,221 +221,8 @@ int main()
 
     return fcl::InterpMotion<double>(start_tx, end_tx);
   };
-  //2d CA implementation circle
-#if 0
-  double combined_radius = 0.5 + 0.5;
-  Eigen::Vector3d a(0,0,0), b_start(-2,0,0);
   
-  Eigen::Vector3d v_step(2, 0, 0);
-  Eigen::Vector3d b_to_a = a - b_start;
-  double dist = b_to_a.norm() - combined_radius;
-
-  double tol = 0.001;
-  double t = 0.0f;
-  uint iter = 0;
-  while (abs(dist) > tol && t < 1.0)
-  {
-    printf("======= iter:%d\n", iter);
-    printf("dist: %f, t: %f\n", dist, t);
-
-    std::cout << "b_to_a: \n" << b_to_a << std::endl;
-    Eigen::Vector3d b_to_a_normalized = b_to_a.normalized();
-
-    std::cout << b_to_a_normalized << std::endl;
-    double vel_bound = (b_to_a_normalized.dot(v_step));
-    double delta = abs(dist) / vel_bound;
-    t += delta;
-    
-    /*dist = -2 + t * (0 - (-2));
-    dist -= combined_radius;*/
-    Eigen::Vector3d b = b_start + v_step * t;
-    b_to_a = a - b;
-    dist = b_to_a.norm() - combined_radius;
-
-    printf("vel_bound %f, delta: %f t: %f dist: %f\n", vel_bound, delta, t, dist);
-    ++iter;
-    // if (iter > 2)
-    //   break;
-  }
-  if (t < 1.0)
-    printf("time of impact: %f\n", t);
-  else
-    printf("no collide\n");
-#endif
-
-#if 0 //CA with seperated circle shapes
-  double a_radius = 0.5, b_radius = 0.5, b2_radius = 0.6;
-  double combined_radius = 0.5 + 0.5;
-  Eigen::Vector3d a(0,0,0), b_start(-2, 2,0), b_end(0, 2, 0);
-  Eigen::Vector3d b2_offset(0, -2, 0);
-  
-  Eigen::Vector3d v_step = b_end - b_start;
-
-  auto get_min_dist = [](Eigen::Vector3d a, double a_radius,
-    Eigen::Vector3d b, double b_radius, 
-    Eigen::Vector3d b2_offset, double b2_radius,
-    Eigen::Vector3d& d, double& dist)
-  {
-    Eigen::Vector3d b2 = b + b2_offset;
-
-    Eigen::Vector3d a_to_b = b - a;
-    double a_to_b_dist = a_to_b.norm();
-    double d1 = a_to_b_dist - (a_radius + b_radius);
-
-    Eigen::Vector3d a_to_b2 = b2 - a;
-    double a_to_b2_dist = a_to_b2.norm();
-    double d2 = a_to_b2_dist - (a_radius + b2_radius);
-    if (d1 < d2)
-    {
-      printf("b is closer\n");
-      dist = d1;
-      d = -a_to_b;
-    }
-    else
-    {
-      printf("b2 is closer\n");
-      dist = d2;
-      d = -a_to_b2;
-    }
-  };
-
-  double dist = 0.0;
-  Eigen::Vector3d b = b_start, d(0,0,0);
-  get_min_dist(a, a_radius, b, b_radius, b2_offset, b2_radius,
-    d, dist);
-
-  double tol = 0.001;
-  double t = 0.0f;
-  uint iter = 0;
-  while (abs(dist) > tol && t < 1.0)
-  {
-    printf("======= iter:%d\n", iter);
-    printf("dist: %f, t: %f\n", dist, t);
-
-    std::cout << "d: \n" << d << std::endl;
-    Eigen::Vector3d d_normalized = d.normalized();
-    std::cout << "d_norm: \n" << d_normalized << std::endl;
-
-    double vel_bound = (d_normalized.dot(v_step));
-    printf("vel_bound: %f\n", vel_bound);
-
-    double delta = abs(dist) / vel_bound;
-    t += delta;
-    
-    /*dist = -2 + t * (0 - (-2));
-    dist -= combined_radius;*/
-    Eigen::Vector3d b = b_start + v_step * t;
-    get_min_dist(a, a_radius, b, b_radius, b2_offset, b2_radius,
-      d, dist);
-    
-    printf("vel_bound %f, delta: %f t: %f dist: %f\n", vel_bound, delta, t, dist);
-    ++iter;
-    // if (iter > 2)
-    //   break;
-  }
-  if (t < 1.0)
-    printf("time of impact: %f\n", t);
-  else
-    printf("no collide\n");
-
-#endif
-
-#if 0 //CA with seperated circle shapes, rotation on the spot
-  double a_radius = 0.5, b_radius = 0.5, b2_radius = 0.6;
-  double combined_radius = 0.5 + 0.5;
-  Eigen::Vector3d a(0,0,0), b_start(-3, 0,0), b_end(-2, 0, 0);
-  double b_rot_end = EIGEN_PI / 2.0;
-  Eigen::Vector3d b2_offset(0, -1, 0);
-  
-  Eigen::Vector3d v_step = b_end - b_start;
-
-  auto get_min_dist = [](Eigen::Vector3d a, double a_radius,
-    Eigen::Vector3d b, double b_radius, 
-    Eigen::Vector3d b2_offset, double b2_rotation, double b2_radius,
-    Eigen::Vector3d& d, double& dist)
-  {
-    Eigen::Vector3d b2(
-      (double)cos(b2_rotation) * b2_offset.x() - (double)sin(b2_rotation) * b2_offset.y(),
-      (double)sin(b2_rotation) * b2_offset.x() + (double)cos(b2_rotation) * b2_offset.y(),
-      0.0);
-    b2 = b + b2;
-    std::cout << "b2:\n" << b2 << std::endl;
-    
-    Eigen::Vector3d a_to_b = b - a;
-    double a_to_b_dist = a_to_b.norm();
-    double d1 = a_to_b_dist - (a_radius + b_radius);
-
-    Eigen::Vector3d a_to_b2 = b2 - a;
-    double a_to_b2_dist = a_to_b2.norm();
-    double d2 = a_to_b2_dist - (a_radius + b2_radius);
-    if (d1 < d2)
-    {
-      printf("b is closer\n");
-      dist = d1;
-      d = -a_to_b;
-    }
-    else
-    {
-      printf("b2 is closer\n");
-      dist = d2;
-      d = -a_to_b2;
-    }
-  };
-
-  double dist = 0.0;
-  Eigen::Vector3d b = b_start, d(0,0,0);
-  get_min_dist(a, a_radius, b, b_radius, b2_offset, 0.0, b2_radius,
-    d, dist);
-
-  double tol = 0.01;
-  double t = 0.0;
-  uint iter = 0;
-  while (abs(dist) > tol && t < 1.0)
-  {
-    printf("======= iter:%d\n", iter);
-    printf("dist: %f, t: %f\n", dist, t);
-
-    std::cout << "d: \n" << d << std::endl;
-    Eigen::Vector3d d_normalized = d.normalized();
-    std::cout << "d_norm: \n" << d_normalized << std::endl;
-
-    double vel_bound = (d_normalized.dot(v_step) + (1.0 + 0.6) * b_rot_end);
-    printf("vel_bound: %f\n", vel_bound);
-
-    double delta = abs(dist) / vel_bound;
-    t += delta;
-    
-    Eigen::Vector3d b = b_start + v_step * t;
-    get_min_dist(a, a_radius, b, b_radius, b2_offset, t * b_rot_end, b2_radius,
-      d, dist);
-    
-    printf("vel_bound %f, delta: %f t: %f dist: %f\n", vel_bound, delta, t, dist);
-    ++iter;
-    // if (iter > 2)
-    //   break;
-  }
-  if (t < 1.0)
-    printf("time of impact: %f\n", t);
-  else
-    printf("no collide\n");
-
-#endif
-#if 0
-  {
-    printf("============\n============\n");
-    fcl::Transform3d b2_offset;
-    b2_offset.setIdentity();
-    b2_offset.pretranslate(Eigen::Vector3d(0, -1.0, 0));
-
-    double impact_time = 0.0;
-    bool res = rmf_planner_viz::draw::CA_collide_seperable_circles(
-      Eigen::Vector3d(0,0,0), Eigen::Vector3d(0,0,0), 0.0, 0.0, 0.5, //a
-      Eigen::Vector3d(-3,0,0), Eigen::Vector3d(-2,0,0), 0.0, EIGEN_PI / 2.0, 0.5, //b
-      b2_offset, 0.6,
-      impact_time, 0.01);
-  }
-#endif
-
+  // custom spline
   auto to_customspline = [](const std::array<Eigen::Vector3d, 4>& knots) {
     std::array<Eigen::Vector3d, 4> Td;
     std::array<Eigen::Vector3d, 4> Rd;
@@ -498,7 +286,7 @@ int main()
     ImGui::SFML::Update(app_window, deltaClock.restart());
     
     ImGui::SetWindowSize(ImVec2(800, 200));
-    ImGui::Begin("FCL Spline control", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+    ImGui::Begin("Sidecar control", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
     
     using namespace std::chrono_literals;
     using namespace rmf_planner_viz::draw;
@@ -509,7 +297,7 @@ int main()
       // ImGui::Text("knots_b[2]: %f %f %f", knots_b[2][0], knots_b[2][1], knots_b[2][2]);
       // ImGui::Text("knots_b[3]: %f %f %f", knots_b[3][0], knots_b[3][1], knots_b[3][2]);
       std::shared_ptr<fcl::MotionBase<double>> motion_a, motion_b;
-      static int current_preset = 0;
+      static int current_preset = 3;
 
       if (ImGui::Button("Preset #0 (Straight Line vs Stationary)"))
         current_preset = 0;
@@ -596,7 +384,7 @@ int main()
                         Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 0, 0));
 
         auto knots_b =
-            rmf_planner_viz::draw::compute_knots(Eigen::Vector3d(-5, 0, 0), Eigen::Vector3d(-2, 0, EIGEN_PI / 2.0),
+            rmf_planner_viz::draw::compute_knots(Eigen::Vector3d(-5, 0, 0), Eigen::Vector3d(-1.5, 0, EIGEN_PI / 2.0),
                           Eigen::Vector3d(0, 16, 0), Eigen::Vector3d(0, -16, 0));
 
         motion_a = std::make_shared<CustomSplineMotion>(to_customspline(knots_a));
@@ -644,8 +432,8 @@ int main()
       {
         double toi = 0.0;
         bool collide = CA_collide_seperable_circles(
-          *(rmf_planner_viz::draw::CustomSplineMotion*)motion_a.get(), 0.5,
-          *(rmf_planner_viz::draw::CustomSplineMotion*)motion_b.get(), 0.5,
+          *(CustomSplineMotion*)motion_a.get(), 0.5,
+          *(CustomSplineMotion*)motion_b.get(), 0.5,
           shape_b2_offset, 0.6,
           toi, 0.01);
         if (collide)

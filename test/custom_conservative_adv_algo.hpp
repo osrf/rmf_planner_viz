@@ -24,6 +24,7 @@
 #include <Eigen/Dense>
 #include <fcl/math/motion/spline_motion.h>
 #include <rmf_planner_viz/draw/IMDraw.hpp>
+#include <float.h>
 
 namespace rmf_planner_viz {
 namespace draw {
@@ -39,90 +40,91 @@ public:
   {
   }
 
-  bool computeTBound(const fcl::Vector3d& n, double& t_bound) const
+  bool computeTBoundBilateralAdv(const fcl::Vector3d& d_norm, double dist_along_d, 
+    const fcl::Transform3d& offset_shape_tx, double& t_bound)
   {
-    //computing the highest T for the translational part of the spline
-    //along a given vector n
+    double current_t = this->tf_t;
 
-    Eigen::Vector3d derivative_coeff_a =
-      0.5 * (Td[3] - 3.0 * Td[2] + 3.0 * Td[1] + Td[0]);
-    Eigen::Vector3d derivative_coeff_b =
-      (Td[0] - 2.0 * Td[1] + Td[2]);
-    Eigen::Vector3d derivative_coeff_c =
-      (-0.5 * Td[0]) + (0.5 * Td[2]);
+    fcl::Transform3d current_tf;
+    this->getCurrentTransform(current_tf);
 
-    // dotp is associative, so we have a quadratic formula, equate it to 0 and solve for t
-    double coeff_a = derivative_coeff_a.dot(n);
-    double coeff_b = derivative_coeff_b.dot(n);
-    double coeff_c = derivative_coeff_c.dot(n);
-    
-    // solve for potential t 
-    if (coeff_a == 0.0) 
-    {
-      printf("coeff_a is 0\n");
-      return false; //no roots
-    }
-    
-    double b_sq_minus_4ac = coeff_b * coeff_b - 4.0 * coeff_a * coeff_c;
-    if (b_sq_minus_4ac < 0)
-    {
-      printf("imag roots\n");
-      return false; //imaginary roots
-    }
-    
-    double t1 = (-coeff_b + sqrt(b_sq_minus_4ac)) / (2.0 * coeff_a);
-    double t2 = (-coeff_b - sqrt(b_sq_minus_4ac)) / (2.0 * coeff_a);
-
-    t_bound = t1 < t2 ? t2 : t1;
-    
-    printf("t1: %f t2: %f\n", t1, t2);
-    return true;
-  }
-
-  bool computeTBoundBilateralAdv(const fcl::Vector3d& d_norm, double dist_along_d, double& t_bound)
-  {
-    fcl::Transform3d tf;
-    this->getCurrentTransform(tf);
-
-    auto currentpoint = tf.translation();
+    // get the current position and rotation
+    auto current_point = current_tf.translation();
 
     //find point (or t) that is <= dist_along_d
     //use bisection method. 
     double lower_t_limit = this->tf_t;
     double upper_t_limit = 1.0f;
     
-    Eigen::Vector3d p = currentpoint;
+    double prev_diff_abs = DBL_MAX;
+    double prev_t = this->tf_t;
+    Eigen::Vector3d p = current_point;
     uint iter = 0;
     do
     {
       double t = lower_t_limit + 0.5 * (upper_t_limit - lower_t_limit);
+      printf("picked t: %f\n", t);
+      // integrate
+      this->integrate(t);
 
-      p = Td[0] * getWeight0(t) + Td[1] * getWeight1(t) + 
-        Td[2] * getWeight2(t) + Td[3] * getWeight3(t);
+      fcl::Transform3d tf;
+      this->getCurrentTransform(tf);
+      auto p1 = tf.translation();
+      auto p2 = offset_shape_tx * p1;
+
+      // p = Td[0] * getWeight0(t) + Td[1] * getWeight1(t) + 
+      //   Td[2] * getWeight2(t) + Td[3] * getWeight3(t);
       //IMDraw::draw_circle(sf::Vector2f(p.x(), p.y()), 0.5);
 
-      auto current_pt_to_point_at_t = p - currentpoint;
+      auto get_projected_dist = [&current_point, &d_norm](Eigen::Vector3d p)
+      {
+        auto current_pt_to_p = p - current_point;
+        return current_pt_to_p.dot(d_norm);
+      };
 
-      double projected_dist = current_pt_to_point_at_t.dot(d_norm);
+      double projected_dist_p1 = get_projected_dist(p1);
+      double projected_dist_p2 = get_projected_dist(p2);
+
+      // take the furthest distance
+      double projected_dist = projected_dist_p1 < projected_dist_p2 ?
+        projected_dist_p2 : projected_dist_p1;
+
       double diff = projected_dist - dist_along_d;
-      // printf("projected_dist_sq: %f dist_along_d: %f diff: %f\n",
-      //   projected_dist, dist_along_d, diff);
+      printf("projected_dist: %f dist_along_d: %f diff: %f\n",
+        projected_dist, dist_along_d, diff);
       
-      const double tolerance = 0.01;
-      if (abs(diff) < tolerance)
+      if (abs(diff) > prev_diff_abs)
+      {
+        t_bound = prev_t; 
+        printf("reversion of abs distance, reverting to prev_t: %f\n", prev_t);
+        break;
+      }
+
+
+      prev_diff_abs = abs(diff);
+      prev_t = t;
+
+      printf("[%.9f, %.9f], range: %f\n", lower_t_limit, upper_t_limit,
+        upper_t_limit - lower_t_limit);
+      if (lower_t_limit == upper_t_limit)
       {
         t_bound = t;
+        printf("range equal\n");
+        break;
+      }
+      const double tolerance = 0.01;
+      
+      if (abs(diff) < tolerance || (upper_t_limit - lower_t_limit) < tolerance)
+      {
+        t_bound = t;
+        printf("range too small\n");
         break;
       }
 
       if (diff < 0.0) //projected dist not enough, search for a higher t
-      {
         lower_t_limit = t;
-      }
       else if (diff > 0.0) //projected dist too excessive, choose a lower t
-      {
         upper_t_limit = t;
-      }
 
       if (t >= 1.0)
       {
@@ -134,6 +136,7 @@ public:
     } while(1);
 
     printf("selected t_bound: %f\n", t_bound);
+    this->integrate(current_t); //reset
     return false;
   }
 };

@@ -137,11 +137,6 @@ bool CA_collide_seperable_circles(
   {
     Eigen::Vector3d a = a_tf.translation();
     Eigen::Vector3d b = b_tf.translation();
-
-    // fcl::Transform3d b_tx;
-    // b_tx.setIdentity();
-    // b_tx.prerotate(fcl::AngleAxis<double>(b_rot, Eigen::Vector3d::UnitZ()));
-    // b_tx.pretranslate(b);
     
     auto b2_tx = b_tf * b2_offset;
     Eigen::Vector3d b2 = b2_tx.translation();
@@ -162,7 +157,7 @@ bool CA_collide_seperable_circles(
     }
     else
     {
-      printf("b2 is closer (dist: %f)\n", d1);
+      printf("b2 is closer (dist: %f)\n", d2);
       dist = d2;
       d = b2_to_a;
     }
@@ -185,31 +180,17 @@ bool CA_collide_seperable_circles(
   motion_b.getCurrentTransform(b_tf);
   auto b_end = b_tf.translation();
 
-  Eigen::Vector3d a_vstep = a_end - a_start;
-  Eigen::Vector3d b_vstep = b_end - b_start;
-  Eigen::Vector3d v_step = b_vstep - a_vstep;
-
   double dist = 0.0;
   Eigen::Vector3d d(0,0,0);
   calc_min_dist(a_start_tf, a_radius, b_start_tf, b_radius,
     b2_offset, b2_radius, d, dist);
-
-  //double a_rot_diff = a_rot_end - a_rot_start;
-  double a_rot_diff = 0.0;
-  double a_furthest_pt_dist = a_radius;
-
-  //double b_rot_diff = EIGEN_PI / 2.0;
-  double b_rot_diff = 0.0;
-  Eigen::Vector3d b2_start = b2_offset * b_start;
-  double b_furthest_pt_dist = (b2_start - b_start).norm() + b2_radius;
-  b_furthest_pt_dist = b_furthest_pt_dist < b_radius ? b_radius : b_furthest_pt_dist;
 
   motion_a.integrate(0.0);
   motion_b.integrate(0.0);
   
   double t = 0.0;
   uint iter = 0;
-  while (abs(dist) > tolerance && t < 1.0)
+  while (dist > tolerance && t < 1.0)
   {
     printf("======= iter:%d\n", iter);
     Eigen::Vector3d d_normalized = d.normalized();
@@ -220,15 +201,24 @@ bool CA_collide_seperable_circles(
     //printf("vel_bound: %f\n", vel_bound);
 
     std::cout << "d_norm: \n" << d_normalized << std::endl;
-    double tbound = 0.0;
-    bool res = motion_b.computeTBoundBilateralAdv(d_normalized, dist, tbound);
+    double t_bound = 0.0;
+    motion_b.computeTBoundBilateralAdv(d_normalized, dist, b2_offset, t_bound);
+
+    // fcl::Transform3d offset_tx;
+    // offset_tx.setIdentity();
+    //double tbound_mainshape = 0.0;
+    // printf("start mainshape\n");
+    // motion_b.computeTBoundBilateralAdv(d_normalized, dist, offset_tx, tbound_mainshape);
+    // printf("tbound_mainshape: %f\n", tbound_mainshape);
+
+    // printf("start offsetshape\n");
+    // double tbound_offsetshape = 0.0;
+    // motion_b.computeTBoundBilateralAdv(d_normalized, dist, b2_offset, tbound_offsetshape);
+    // printf("tbound_offsetshape: %f\n", tbound_offsetshape);
     
-    //double delta = abs(dist) / (tbound + 0.0);
-    double delta = tbound;
-    printf("motion_b.computeTBoundBilateralAdv(d_normalized, t): %f\n", tbound);
-    //printf("motion_b.computeDWMax(): %f\n", motion_b.computeDWMax());
-    printf("delta: %f\n", delta);
-    t = delta;
+    //t = std::min(tbound_mainshape, tbound_offsetshape);
+    t = t_bound;
+    printf("t: %f\n", t);
 
     motion_a.integrate(t);
     motion_b.integrate(t);
