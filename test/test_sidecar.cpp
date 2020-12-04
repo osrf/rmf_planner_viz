@@ -148,8 +148,7 @@ int main()
   
   fcl::Transform3d shape_b2_offset;
   shape_b2_offset.setIdentity();
-  shape_b2_offset.pretranslate(Eigen::Vector3d(0, -1.0, 0));
-
+  
   auto shape_b_bvh = std::make_shared<fcl::BVHModel<fcl::OBBRSSd>>();
   auto box_to_triangle_vertices = [](const fcl::Boxd& box, const fcl::Transform3d& pose, std::vector<fcl::Vector3d>& vertices_out, 
     std::vector<fcl::Triangle>& triangles_out)
@@ -200,6 +199,27 @@ int main()
 #endif
   }
 
+  Eigen::Vector3d a_start(0,0,0), a_end(0,0,0);
+  double a_rot_start = 0.0, a_rot_end = 0.0;
+
+  Eigen::Vector3d b_start(0,0,0), b_end(0,0,0);
+  double b_rot_start = 0.0, b_rot_end = 0.0;
+
+  auto to_interp_motion = [](Eigen::Vector3d start, Eigen::Vector3d end,
+        double start_rot, double end_rot)
+  {
+    fcl::Transform3d start_tx, end_tx;
+
+    start_tx.setIdentity();
+    start_tx.prerotate(fcl::AngleAxis<double>(start_rot, Eigen::Vector3d::UnitZ()));
+    start_tx.pretranslate(start);
+
+    end_tx.setIdentity();
+    end_tx.prerotate(fcl::AngleAxis<double>(end_rot, Eigen::Vector3d::UnitZ()));
+    end_tx.pretranslate(end);
+
+    return fcl::InterpMotion<double>(start_tx, end_tx);
+  };
   //2d CA implementation circle
 #if 0
   double combined_radius = 0.5 + 0.5;
@@ -399,6 +419,7 @@ int main()
     printf("no collide\n");
 
 #endif
+#if 0
   {
     printf("============\n============\n");
     fcl::Transform3d b2_offset;
@@ -409,6 +430,49 @@ int main()
     bool res = rmf_planner_viz::draw::CA_collide_seperable_circles(
       Eigen::Vector3d(0,0,0), Eigen::Vector3d(0,0,0), 0.0, 0.0, 0.5, //a
       Eigen::Vector3d(-3,0,0), Eigen::Vector3d(-2,0,0), 0.0, EIGEN_PI / 2.0, 0.5, //b
+      b2_offset, 0.6,
+      impact_time, 0.01);
+  }
+#endif
+
+  auto to_customspline = [](const std::array<Eigen::Vector3d, 4>& knots) {
+    std::array<Eigen::Vector3d, 4> Td;
+    std::array<Eigen::Vector3d, 4> Rd;
+
+    for (std::size_t i = 0; i < 4; ++i) {
+      const Eigen::Vector3d p = knots[i];
+      Td[i] = Eigen::Vector3d(p[0], p[1], 0.0);
+      Rd[i] = Eigen::Vector3d(0.0, 0.0, p[2]);
+    }
+
+    return rmf_planner_viz::draw::CustomSplineMotion(
+      Td[0], Td[1], Td[2], Td[3], Rd[0], Rd[1], Rd[2], Rd[3]);
+  };
+
+  {
+    printf("============\n============\n");
+    fcl::Transform3d b2_offset;
+    b2_offset.setIdentity();
+    b2_offset.pretranslate(Eigen::Vector3d(1, 0.0, 0));
+
+    auto knots_a =
+          rmf_planner_viz::draw::compute_knots(Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 0, 0),
+                        Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 0, 0));
+
+    auto knots_b =
+        rmf_planner_viz::draw::compute_knots(Eigen::Vector3d(-5, 0, 0), Eigen::Vector3d(-2, 0, 0),
+                      Eigen::Vector3d(0, 16, 0), Eigen::Vector3d(0, -16, 0));
+
+    // auto motion_a = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_a));
+    // auto motion_b = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_b));
+    
+    auto motion_a = to_customspline(knots_a);
+    auto motion_b = to_customspline(knots_b);
+
+    double impact_time = 0.0;
+    bool res = rmf_planner_viz::draw::CA_collide_seperable_circles(
+      motion_a, 0.5, //a
+      motion_b, 0.5, //b
       b2_offset, 0.6,
       impact_time, 0.01);
   }
@@ -433,7 +497,7 @@ int main()
 
     ImGui::SFML::Update(app_window, deltaClock.restart());
     
-    ImGui::SetWindowSize(ImVec2(600, 200));
+    ImGui::SetWindowSize(ImVec2(800, 200));
     ImGui::Begin("FCL Spline control", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
     
     using namespace std::chrono_literals;
@@ -445,44 +509,104 @@ int main()
       // ImGui::Text("knots_b[2]: %f %f %f", knots_b[2][0], knots_b[2][1], knots_b[2][2]);
       // ImGui::Text("knots_b[3]: %f %f %f", knots_b[3][0], knots_b[3][1], knots_b[3][2]);
       std::shared_ptr<fcl::MotionBase<double>> motion_a, motion_b;
-      static int current_preset = 2;
-      if (ImGui::Button("Preset #0 (SplineMotion)"))
-        current_preset = 0;
-      if (ImGui::Button("Preset #1 (SplineMotion Arc)"))
-        current_preset = 1;
-      if (ImGui::Button("Preset #2 (InterpMotion)"))
-        current_preset = 2;
-      
-      ImGui::Separator();
+      static int current_preset = 0;
 
+      if (ImGui::Button("Preset #0 (Straight Line vs Stationary)"))
+        current_preset = 0;
+      if (ImGui::Button("Preset #1 (On the spot rotation vs Stationary)"))
+        current_preset = 1;
+
+      //if (ImGui::Button("Preset #4 (CustomSplineMotion Straight Line vs Stationary)"))
+      //if (ImGui::Button("Preset #5 (CustomSplineMotion On the spot rotation vs Stationary)"))
+      if (ImGui::Button("Preset #2 (CustomSplineMotion Arc without rotation vs Stationary)"))
+        current_preset = 2;
+      if (ImGui::Button("Preset #3 (CustomSplineMotion Arc with rotation vs Stationary)"))
+        current_preset = 3;
+      
+      if (ImGui::Button("Preset #99 (trianglemesh (not working))"))
+        current_preset = 99;
+
+      // setup
       if (current_preset == 0)
       {
-        auto knots_a =
-          rmf_planner_viz::draw::compute_knots(Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 0, 0),
-                        Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 0, 0));
+        shape_b2_offset.setIdentity();
+        shape_b2_offset.pretranslate(Eigen::Vector3d(0, -1.0, 0));
+        
+        a_start = Eigen::Vector3d(0, 0, 0);
+        a_end = Eigen::Vector3d(0, 0, 0);
+        a_rot_start = a_rot_end = 0.0;
 
-        auto knots_b =
-            rmf_planner_viz::draw::compute_knots(Eigen::Vector3d(-3, 0, 0), Eigen::Vector3d(-2, 0, EIGEN_PI / 2.0),
-                          Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 0, 0));
+        b_start = Eigen::Vector3d(-3, 2, 0);
+        b_end = Eigen::Vector3d(0, 2, 0);
+        b_rot_start = b_rot_end = 0.0;
 
-        motion_a = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_a));
-        motion_b = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_b));
+        // for rendering
+        fcl::Transform3d identity;
+        identity.setIdentity();
+        
+        motion_a = std::make_shared<fcl::InterpMotion<double>>(identity, identity);
+        motion_b = std::make_shared<fcl::InterpMotion<double>>(
+          to_interp_motion(b_start, b_end, b_rot_start, b_rot_end));
       }
       else if (current_preset == 1)
       {
+        shape_b2_offset.setIdentity();
+        shape_b2_offset.pretranslate(Eigen::Vector3d(0, -1.0, 0));
+
+        a_start = Eigen::Vector3d(0, 0, 0);
+        a_end = Eigen::Vector3d(0, 0, 0);
+        a_rot_start = a_rot_end = 0.0;
+
+        b_start = Eigen::Vector3d(-2, 0, 0);
+        b_end = Eigen::Vector3d(-2, 0, 0);
+        b_rot_start = 0;
+        b_rot_end = EIGEN_PI / 2.0;
+
+        // for rendering
+        fcl::Transform3d identity;
+        identity.setIdentity();
+
+        motion_a = std::make_shared<fcl::InterpMotion<double>>(identity, identity);
+        motion_b = std::make_shared<fcl::InterpMotion<double>>(
+          to_interp_motion(b_start, b_end, b_rot_start, b_rot_end));
+      }
+      else if (current_preset == 2)
+      {
+        shape_b2_offset.setIdentity();
+        shape_b2_offset.pretranslate(Eigen::Vector3d(1, 0.0, 0));
+
         auto knots_a =
           rmf_planner_viz::draw::compute_knots(Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 0, 0),
                         Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 0, 0));
 
         auto knots_b =
-            rmf_planner_viz::draw::compute_knots(Eigen::Vector3d(-2 - 0.15, 0, 0), Eigen::Vector3d(-2 + 0.15, 0, EIGEN_PI / 2.0),
-                          Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 0, 0));
+            rmf_planner_viz::draw::compute_knots(Eigen::Vector3d(-5, 0, 0), Eigen::Vector3d(-2, 0, 0),
+                          Eigen::Vector3d(0, 16, 0), Eigen::Vector3d(0, -16, 0));
 
-        motion_a = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_a));
-        motion_b = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_b));
+        motion_a = std::make_shared<CustomSplineMotion>(to_customspline(knots_a));
+        motion_b = std::make_shared<CustomSplineMotion>(to_customspline(knots_b)); 
       }
-      else
+      else if (current_preset == 3)
       {
+        shape_b2_offset.setIdentity();
+        shape_b2_offset.pretranslate(Eigen::Vector3d(0, -1.0, 0));
+
+        auto knots_a =
+          rmf_planner_viz::draw::compute_knots(Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 0, 0),
+                        Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 0, 0));
+
+        auto knots_b =
+            rmf_planner_viz::draw::compute_knots(Eigen::Vector3d(-5, 0, 0), Eigen::Vector3d(-2, 0, EIGEN_PI / 2.0),
+                          Eigen::Vector3d(0, 16, 0), Eigen::Vector3d(0, -16, 0));
+
+        motion_a = std::make_shared<CustomSplineMotion>(to_customspline(knots_a));
+        motion_b = std::make_shared<CustomSplineMotion>(to_customspline(knots_b));
+      }
+      else if (current_preset == 99)
+      {
+        shape_b2_offset.setIdentity();
+        shape_b2_offset.pretranslate(Eigen::Vector3d(0, -1.0, 0));
+
         fcl::Transform3<double> identity;
         identity.setIdentity();
 
@@ -498,19 +622,46 @@ int main()
         motion_b = std::make_shared<fcl::InterpMotion<double>>(b_start, b_end);
       }
       
-      const auto obj_a = fcl::ContinuousCollisionObject<double>(shape_a, motion_a);
-      const auto obj_b = fcl::ContinuousCollisionObject<double>(shape_b_bvh, motion_b);
-      
-      fcl::ContinuousCollisionRequest<double> request;
-      request.ccd_solver_type = fcl::CCDC_CONSERVATIVE_ADVANCEMENT;
-      request.gjk_solver_type = fcl::GST_LIBCCD;
+      ImGui::Separator();
+      ImGui::Text("Preset: %d", current_preset);
 
-      // reset the motions
-      motion_a->integrate(0.0);
-      motion_b->integrate(0.0);
-
-      
+      // collision
+      if (current_preset >= 0 && current_preset <= 1)
       {
+        double toi = 0.0;
+        bool collide = CA_collide_seperable_circles(
+          a_start, a_end, a_rot_start, a_rot_end, 0.5,
+          b_start, b_end, b_rot_start, b_rot_end, 0.5,
+          shape_b2_offset, 0.6,
+          toi);
+        if (collide)
+          ImGui::Text("Collide! TOI: %f", toi);
+        else
+          ImGui::Text("No collision");
+
+      }
+      else if (current_preset >= 2 && current_preset <= 3)
+      {
+        double toi = 0.0;
+        bool collide = CA_collide_seperable_circles(
+          *(rmf_planner_viz::draw::CustomSplineMotion*)motion_a.get(), 0.5,
+          *(rmf_planner_viz::draw::CustomSplineMotion*)motion_b.get(), 0.5,
+          shape_b2_offset, 0.6,
+          toi, 0.01);
+        if (collide)
+          ImGui::Text("Collide! TOI: %f", toi);
+        else
+          ImGui::Text("No collision");
+      }
+      else if (current_preset == 99)
+      {
+        const auto obj_a = fcl::ContinuousCollisionObject<double>(shape_a, motion_a);
+        const auto obj_b = fcl::ContinuousCollisionObject<double>(shape_b_bvh, motion_b);
+        
+        fcl::ContinuousCollisionRequest<double> request;
+        request.ccd_solver_type = fcl::CCDC_CONSERVATIVE_ADVANCEMENT;
+        request.gjk_solver_type = fcl::GST_LIBCCD;
+
         // test for collision
         fcl::ContinuousCollisionResultd result;
         fcl::collide(&obj_a, &obj_b, request, result);
@@ -520,6 +671,11 @@ int main()
         else
           ImGui::Text("No collision");
       }
+
+      // reset the motions
+      motion_a->integrate(0.0);
+      motion_b->integrate(0.0);
+      
       // draw robot circle on motion
       static float interp = 0.0f;
       ImGui::InputFloat("interp", &interp, 0.01);
