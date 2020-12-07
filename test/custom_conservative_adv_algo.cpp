@@ -29,44 +29,70 @@ namespace rmf_planner_viz {
 namespace draw {
 
 bool CA_collide_seperable_circles(
-  Eigen::Vector3d a_start, Eigen::Vector3d a_end, double a_rot_start, double a_rot_end, double a_radius,
-  Eigen::Vector3d b_start, Eigen::Vector3d b_end, double b_rot_start, double b_rot_end, double b_radius,
-  fcl::Transform3d b2_offset, double b2_radius,
+  Eigen::Vector3d a_start, Eigen::Vector3d a_end, double a_rot_start, double a_rot_end,
+  Eigen::Vector3d b_start, Eigen::Vector3d b_end, double b_rot_start, double b_rot_end,
+  const std::vector<ModelSpaceShape>& a_shapes,
+  const std::vector<ModelSpaceShape>& b_shapes,
   double& impact_time, double tolerance)
 {
+  if (a_shapes.empty() || b_shapes.empty())
+    return false;
+
   auto calc_min_dist = [](
-    Eigen::Vector3d a, double a_rot, double a_radius, 
-    Eigen::Vector3d b, double b_rot, double b_radius,
-    fcl::Transform3d b2_offset, double b2_radius,
-    Eigen::Vector3d& d, double& dist)
+    Eigen::Vector3d a, double a_rot,
+    Eigen::Vector3d b, double b_rot,
+    const std::vector<ModelSpaceShape>& a_shapes,
+    const std::vector<ModelSpaceShape>& b_shapes,
+    Eigen::Vector3d& d, double& min_dist)
   {
-    fcl::Transform3d b_tx;
+    fcl::Transform3d a_tx, b_tx;
+    
+    a_tx.setIdentity();
+    a_tx.prerotate(fcl::AngleAxis<double>(a_rot, Eigen::Vector3d::UnitZ()));
+    a_tx.pretranslate(a);
+
     b_tx.setIdentity();
     b_tx.prerotate(fcl::AngleAxis<double>(b_rot, Eigen::Vector3d::UnitZ()));
     b_tx.pretranslate(b);
     
-    auto b2_tx = b_tx * b2_offset;
-    Eigen::Vector3d b2 = b2_tx.translation();
-    
-    Eigen::Vector3d b_to_a = a - b;
-    double b_to_a_dist = b_to_a.norm();
-    double d1 = b_to_a_dist - (a_radius + b_radius);
+    min_dist = DBL_MAX;
+    for (const auto& a_shape : a_shapes)
+    {
+      auto a_shape_tx = a_tx * a_shape._transform;
 
-    Eigen::Vector3d b2_to_a = a - b2;
-    double b2_to_a_dist = b2_to_a.norm();
-    double d2 = b2_to_a_dist - (a_radius + b2_radius);
-    if (d1 < d2)
-    {
-      // printf("b is closer\n");
-      dist = d1;
-      d = b_to_a;
+      for (const auto& b_shape : b_shapes)
+      {
+        auto b_shape_tx = b_tx * b_shape._transform;
+        Eigen::Vector3d b_to_a = a_shape_tx.translation() - b_shape_tx.translation();
+        double dist = b_to_a.norm() - (a_shape._radius + b_shape._radius);
+        if (dist < min_dist)
+        {
+          min_dist = dist;
+          d = b_to_a;
+        }
+      }
     }
-    else
+  };
+  auto get_furthest_point_dist = [](
+    Eigen::Vector3d start, double rot_start,
+    const std::vector<ModelSpaceShape>& shapes)
+  {
+    fcl::Transform3d tx;
+    
+    tx.setIdentity();
+    tx.prerotate(fcl::AngleAxis<double>(rot_start, Eigen::Vector3d::UnitZ()));
+    tx.pretranslate(start);
+
+    double d = 0.0;
+    for (const auto& shape : shapes)
     {
-      // printf("b2 is closer\n");
-      dist = d2;
-      d = b2_to_a;
+      auto shape_tx = tx * shape._transform;
+
+      double furthest_dist = (shape_tx.translation() - start).norm() + shape._radius;
+      if (furthest_dist > d)
+        d = furthest_dist;
     }
+    return d;
   };
 
   Eigen::Vector3d a_vstep = a_end - a_start;
@@ -75,16 +101,14 @@ bool CA_collide_seperable_circles(
 
   double dist = 0.0;
   Eigen::Vector3d d(0,0,0);
-  calc_min_dist(a_start, a_rot_start, a_radius, b_start, b_rot_start, b_radius,
-    b2_offset, b2_radius, d, dist);
+  calc_min_dist(a_start, a_rot_start, b_start, b_rot_start, a_shapes, b_shapes,
+    d, dist);
 
   double a_rot_diff = a_rot_end - a_rot_start;
-  double a_furthest_pt_dist = a_radius;
+  double a_furthest_pt_dist = get_furthest_point_dist(a_start, a_rot_start, a_shapes);
 
   double b_rot_diff = b_rot_end - b_rot_start;
-  Eigen::Vector3d b2_start = b2_offset * b_start;
-  double b_furthest_pt_dist = (b2_start - b_start).norm() + b2_radius;
-  b_furthest_pt_dist = b_furthest_pt_dist < b_radius ? b_radius : b_furthest_pt_dist;
+  double b_furthest_pt_dist = get_furthest_point_dist(b_start, b_rot_start, b_shapes);
 
   double t = 0.0;
   uint iter = 0;
@@ -105,8 +129,7 @@ bool CA_collide_seperable_circles(
     double a_rot = a_rot_start + a_rot_diff * t;
     double b_rot = b_rot_start + b_rot_diff * t;
 
-    calc_min_dist(a, a_rot, a_radius, b, b_rot, b_radius,
-      b2_offset, b2_radius,
+    calc_min_dist(a, a_rot, b, b_rot, a_shapes, b_shapes,
       d, dist);
     
     //printf("vel_bound %f, delta: %f t: %f dist: %f\n", vel_bound, delta, t, dist);

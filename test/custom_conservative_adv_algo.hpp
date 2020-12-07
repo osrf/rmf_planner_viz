@@ -141,13 +141,23 @@ public:
   }
 };
 
-// Custom Conservative Advancement algorithm that uses seperable shapes 
+// Custom Bilateral Advancement algorithm that uses seperable shapes 
+
+struct ModelSpaceShape
+{
+  ModelSpaceShape(const fcl::Transform3d& tx, double r)
+    :_transform(tx), _radius(r)
+  { }
+  fcl::Transform3d _transform;
+  double _radius;
+};
 
 // this uses straight-line linear interpolation motions
 bool CA_collide_seperable_circles(
-  Eigen::Vector3d a_start, Eigen::Vector3d a_end, double a_rot_start, double a_rot_end, double a_radius,
-  Eigen::Vector3d b_start, Eigen::Vector3d b_end, double b_rot_start, double b_rot_end, double b_radius,
-  fcl::Transform3d b2_offset, double b2_radius,
+  Eigen::Vector3d a_start, Eigen::Vector3d a_end, double a_rot_start, double a_rot_end,
+  Eigen::Vector3d b_start, Eigen::Vector3d b_end, double b_rot_start, double b_rot_end,
+  const std::vector<ModelSpaceShape>& a_shapes,
+  const std::vector<ModelSpaceShape>& b_shapes,
   double& impact_time, double tolerance = 0.001);
 
 // this uses spline motions

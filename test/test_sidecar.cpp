@@ -205,22 +205,6 @@ int main()
 
   Eigen::Vector3d b_start(0,0,0), b_end(0,0,0);
   double b_rot_start = 0.0, b_rot_end = 0.0;
-
-  auto to_interp_motion = [](Eigen::Vector3d start, Eigen::Vector3d end,
-        double start_rot, double end_rot)
-  {
-    fcl::Transform3d start_tx, end_tx;
-
-    start_tx.setIdentity();
-    start_tx.prerotate(fcl::AngleAxis<double>(start_rot, Eigen::Vector3d::UnitZ()));
-    start_tx.pretranslate(start);
-
-    end_tx.setIdentity();
-    end_tx.prerotate(fcl::AngleAxis<double>(end_rot, Eigen::Vector3d::UnitZ()));
-    end_tx.pretranslate(end);
-
-    return fcl::InterpMotion<double>(start_tx, end_tx);
-  };
   
   // custom spline
   auto to_customspline = [](const std::array<Eigen::Vector3d, 4>& knots) {
@@ -236,7 +220,7 @@ int main()
     return rmf_planner_viz::draw::CustomSplineMotion(
       Td[0], Td[1], Td[2], Td[3], Rd[0], Rd[1], Rd[2], Rd[3]);
   };
-
+#if 0
   {
     printf("============\n============\n");
     fcl::Transform3d b2_offset;
@@ -264,6 +248,9 @@ int main()
       b2_offset, 0.6,
       impact_time, 0.01);
   }
+#endif
+  fcl::Transform3<double> identity;
+  identity.setIdentity();
 
   sf::Clock deltaClock;
   while (app_window.isOpen())
@@ -315,10 +302,16 @@ int main()
         current_preset = 99;
 
       // setup
+      std::vector<ModelSpaceShape> a_shapes;
+      std::vector<ModelSpaceShape> b_shapes;
       if (current_preset == 0)
       {
+        a_shapes.emplace_back(identity, 0.5);
+        b_shapes.emplace_back(identity, 0.5);
+
         shape_b2_offset.setIdentity();
         shape_b2_offset.pretranslate(Eigen::Vector3d(0, -1.0, 0));
+        b_shapes.emplace_back(shape_b2_offset, 0.6);
         
         a_start = Eigen::Vector3d(0, 0, 0);
         a_end = Eigen::Vector3d(0, 0, 0);
@@ -329,18 +322,24 @@ int main()
         b_rot_start = b_rot_end = 0.0;
 
         // for rendering
-        fcl::Transform3d identity;
-        identity.setIdentity();
-        
-        motion_a = std::make_shared<fcl::InterpMotion<double>>(identity, identity);
-        motion_b = std::make_shared<fcl::InterpMotion<double>>(
-          to_interp_motion(b_start, b_end, b_rot_start, b_rot_end));
+        Eigen::Vector3d zero(0,0,0);
+        auto knots_a =
+          rmf_planner_viz::draw::compute_knots(a_start, a_end, zero, zero);
+        auto knots_b =
+          rmf_planner_viz::draw::compute_knots(b_start, b_end, zero, zero);
+
+        motion_a = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_a));
+        motion_b = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_b));
       }
       else if (current_preset == 1)
       {
+        a_shapes.emplace_back(identity, 0.5);
+        b_shapes.emplace_back(identity, 0.5);
+
         shape_b2_offset.setIdentity();
         shape_b2_offset.pretranslate(Eigen::Vector3d(0, -1.0, 0));
-
+        b_shapes.emplace_back(shape_b2_offset, 0.6);
+        
         a_start = Eigen::Vector3d(0, 0, 0);
         a_end = Eigen::Vector3d(0, 0, 0);
         a_rot_start = a_rot_end = 0.0;
@@ -351,12 +350,20 @@ int main()
         b_rot_end = EIGEN_PI / 2.0;
 
         // for rendering
-        fcl::Transform3d identity;
-        identity.setIdentity();
+        Eigen::Vector3d zero(0,0,0);
+        auto knots_a =
+          rmf_planner_viz::draw::compute_knots(
+            Eigen::Vector3d(a_start.x(), a_start.y(), a_rot_start),
+            Eigen::Vector3d(a_end.x(), a_end.y(), a_rot_end),
+            zero, zero);
+        auto knots_b =
+          rmf_planner_viz::draw::compute_knots(
+            Eigen::Vector3d(b_start.x(), b_start.y(), b_rot_start), 
+            Eigen::Vector3d(b_end.x(), b_end.y(), b_rot_end), 
+            zero, zero);
 
-        motion_a = std::make_shared<fcl::InterpMotion<double>>(identity, identity);
-        motion_b = std::make_shared<fcl::InterpMotion<double>>(
-          to_interp_motion(b_start, b_end, b_rot_start, b_rot_end));
+        motion_a = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_a));
+        motion_b = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_b));
       }
       else if (current_preset == 2)
       {
@@ -395,9 +402,6 @@ int main()
         shape_b2_offset.setIdentity();
         shape_b2_offset.pretranslate(Eigen::Vector3d(0, -1.0, 0));
 
-        fcl::Transform3<double> identity;
-        identity.setIdentity();
-
         fcl::Transform3<double> b_start;
         b_start.setIdentity();
         b_start.translation() = fcl::Vector3d(-2, 0, 0);
@@ -413,17 +417,23 @@ int main()
       ImGui::Separator();
       ImGui::Text("Preset: %d", current_preset);
 
+      sf::Color toi_color(3, 125, 88);
+
       // collision
       if (current_preset >= 0 && current_preset <= 1)
       {
         double toi = 0.0;
         bool collide = CA_collide_seperable_circles(
-          a_start, a_end, a_rot_start, a_rot_end, 0.5,
-          b_start, b_end, b_rot_start, b_rot_end, 0.5,
-          shape_b2_offset, 0.6,
+          a_start, a_end, a_rot_start, a_rot_end,
+          b_start, b_end, b_rot_start, b_rot_end,
+          a_shapes, b_shapes,
           toi);
         if (collide)
+        {
           ImGui::Text("Collide! TOI: %f", toi);
+          draw_robot_on_spline(motion_b.get(), toi, circle_shape->get_characteristic_length(), toi_color);
+          draw_offset_sidecar_on_spline(motion_b.get(), toi, circle_shape_ex->get_characteristic_length(), shape_b2_offset, toi_color);
+        }
         else
           ImGui::Text("No collision");
 
@@ -437,7 +447,11 @@ int main()
           shape_b2_offset, 0.6,
           toi, 0.01);
         if (collide)
+        {
           ImGui::Text("Collide! TOI: %f", toi);
+          draw_robot_on_spline(motion_b.get(), toi, circle_shape->get_characteristic_length(), toi_color);
+          draw_offset_sidecar_on_spline(motion_b.get(), toi, circle_shape_ex->get_characteristic_length(), shape_b2_offset, toi_color);
+        }
         else
           ImGui::Text("No collision");
       }
