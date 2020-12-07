@@ -112,6 +112,7 @@ bool CA_collide_seperable_circles(
   //printf("a:%f b:%f\n", a_furthest_pt_dist, b_furthest_pt_dist);
   //printf("adiff:%f bdiff:%f\n", a_rot_diff, b_rot_diff);
 
+  double prev_min_dist = DBL_MAX;
   double t = 0.0;
   uint iter = 0;
   while (dist_along_d_to_cover > tolerance && t < 1.0)
@@ -161,7 +162,7 @@ bool CA_collide_seperable_circles(
         b_tx.prerotate(fcl::AngleAxis<double>(b_rot, Eigen::Vector3d::UnitZ()));
         b_tx.pretranslate(b);
         
-        double dist_output = DBL_MAX;
+        double dist_diff_output = DBL_MAX;
         // our piecewise distance function
         for (const auto& a_shape : a_shapes)
         {
@@ -176,24 +177,26 @@ bool CA_collide_seperable_circles(
             auto v = dist_along_b_to_a * b_to_a_norm;
             double dist_along_d = v.dot(d_normalized);
 
-            if (dist_along_d < dist_output)
-              dist_output = dist_along_d;
+            double dist_diff = dist_along_d - dist_to_cover;
+            
+            if (dist_diff < dist_diff_output)
+              dist_diff_output = dist_along_d;
 
             if (b_shape._radius == 0.6 && a_shape._radius == 0.6)
               printf("a2b2 dist: %f\n", dist_along_d);
           }
         }
 
-        if (abs(dist_output) > prev_dist_abs)
+        if (abs(dist_diff_output) > prev_dist_abs)
         {
           printf("abs distance increased from the previous sample, reverting to t_at_prev_dist_abs: %f\n", t_at_prev_dist_abs); 
           return t_at_prev_dist_abs;
         }
-        prev_dist_abs = abs(dist_output);
+        prev_dist_abs = abs(dist_diff_output);
         t_at_prev_dist_abs = sample_t;
 
-        printf("dist_output: %f\n", dist_output);
-        if (abs(dist_output) < tolerance)
+        printf("dist_output: %f\n", dist_diff_output);
+        if (abs(dist_diff_output) < tolerance)
         {
           printf("minimal dist within tolerance range %f\n", tolerance);
           return sample_t;
@@ -204,9 +207,9 @@ bool CA_collide_seperable_circles(
           return sample_t;
         }
         
-        if (dist_output < 0.0)
+        if (dist_diff_output < 0.0)
           upper_t_limit = sample_t;
-        else if (dist_output > 0.0)
+        else if (dist_diff_output > 0.0)
           lower_t_limit = sample_t;
 
         ++bilateral_adv_iter;
@@ -220,9 +223,14 @@ bool CA_collide_seperable_circles(
     double a_rot = a_rot_start + a_rot_diff * t;
     double b_rot = b_rot_start + b_rot_diff * t;
 
+    prev_min_dist = dist_along_d_to_cover;
     calc_min_dist(a, a_rot, b, b_rot, a_shapes, b_shapes,
       d, dist_along_d_to_cover);
     
+    // if (prev_min_dist < dist_along_d_to_cover) //ensure an improvement in abs minimum distance
+    // {
+    //   impact_time = t;
+    // }
     // printf("dist_along_d_to_cover: %f\n", dist_along_d_to_cover);
     // printf("vel_bound %f, delta: %f t: %f dist: %f\n", vel_bound, delta, t, dist);
     ++iter;

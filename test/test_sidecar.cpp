@@ -302,13 +302,15 @@ int main()
         current_preset = 1;
       if (ImGui::Button("Preset #2 (2 sidecars rotating and hitting)"))
         current_preset = 2;
+      if (ImGui::Button("Preset #3 (2 sidecars crossing each other)"))
+        current_preset = 3;
 
       //if (ImGui::Button("Preset #4 (CustomSplineMotion Straight Line vs Stationary)"))
       //if (ImGui::Button("Preset #5 (CustomSplineMotion On the spot rotation vs Stationary)"))
       if (ImGui::Button("Preset #3 (CustomSplineMotion Arc without rotation vs Stationary)"))
-        current_preset = 3;
-      if (ImGui::Button("Preset #4 (CustomSplineMotion Arc with rotation vs Stationary)"))
         current_preset = 4;
+      if (ImGui::Button("Preset #4 (CustomSplineMotion Arc with rotation vs Stationary)"))
+        current_preset = 5;
       
       if (ImGui::Button("Preset #99 (trianglemesh (not working))"))
         current_preset = 99;
@@ -419,8 +421,40 @@ int main()
         motion_a = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_a));
         motion_b = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_b));
       }
-      // custom spline
       else if (current_preset == 3)
+      {
+        preset_type = PRESET_LINEAR;
+        a_shapes.emplace_back(identity, 0.5);
+        b_shapes.emplace_back(identity, 0.5);
+
+        shape_a2_offset.setIdentity();
+        shape_a2_offset.pretranslate(Eigen::Vector3d(0, -1.0, 0));
+        a_shapes.emplace_back(shape_a2_offset, 0.6);
+
+        shape_b2_offset.setIdentity();
+        shape_b2_offset.pretranslate(Eigen::Vector3d(0, -1.0, 0));
+        b_shapes.emplace_back(shape_b2_offset, 0.6);
+        
+        a_start = Eigen::Vector3d(2, 3.0, 0);
+        a_end = Eigen::Vector3d(2, -3.0, 0);
+        a_rot_start = a_rot_end = 0.0;
+
+        b_start = Eigen::Vector3d(-3, 0, 0);
+        b_end = Eigen::Vector3d(3, 0, 0);
+        b_rot_start = b_rot_end = 0.0;
+
+        // for rendering
+        Eigen::Vector3d zero(0,0,0);
+        auto knots_a =
+          rmf_planner_viz::draw::compute_knots(a_start, a_end, zero, zero);
+        auto knots_b =
+          rmf_planner_viz::draw::compute_knots(b_start, b_end, zero, zero);
+
+        motion_a = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_a));
+        motion_b = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_b));
+      }
+      // custom spline
+      else if (current_preset == 4)
       {
         preset_type = PRESET_SPLINEMOTION;
         shape_b2_offset.setIdentity();
@@ -437,7 +471,7 @@ int main()
         motion_a = std::make_shared<CustomSplineMotion>(to_customspline(knots_a));
         motion_b = std::make_shared<CustomSplineMotion>(to_customspline(knots_b)); 
       }
-      else if (current_preset == 4)
+      else if (current_preset == 5)
       {
         preset_type = PRESET_SPLINEMOTION;
         shape_b2_offset.setIdentity();
