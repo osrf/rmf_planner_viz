@@ -99,30 +99,121 @@ bool CA_collide_seperable_circles(
   Eigen::Vector3d b_vstep = b_end - b_start;
   Eigen::Vector3d v_step = b_vstep - a_vstep;
 
-  double dist = 0.0;
+  double dist_along_d_to_cover = 0.0;
   Eigen::Vector3d d(0,0,0);
   calc_min_dist(a_start, a_rot_start, b_start, b_rot_start, a_shapes, b_shapes,
-    d, dist);
+    d, dist_along_d_to_cover);
 
   double a_rot_diff = a_rot_end - a_rot_start;
   double a_furthest_pt_dist = get_furthest_point_dist(a_start, a_rot_start, a_shapes);
 
   double b_rot_diff = b_rot_end - b_rot_start;
   double b_furthest_pt_dist = get_furthest_point_dist(b_start, b_rot_start, b_shapes);
+  //printf("a:%f b:%f\n", a_furthest_pt_dist, b_furthest_pt_dist);
+  //printf("adiff:%f bdiff:%f\n", a_rot_diff, b_rot_diff);
 
   double t = 0.0;
   uint iter = 0;
-  while (abs(dist) > tolerance && t < 1.0)
+  while (dist_along_d_to_cover > tolerance && t < 1.0)
   {
     //printf("======= iter:%d\n", iter);
     Eigen::Vector3d d_normalized = d.normalized();
 
-    double vel_bound = d_normalized.dot(v_step) + 
-      a_furthest_pt_dist * a_rot_diff + b_furthest_pt_dist * b_rot_diff;
-    //printf("vel_bound: %f\n", vel_bound);
+    // original conservative adv algorithm for 1 object. 
+    // It breaks on 2 equivalent rotation on the spot sidecars
+    // ie. the terms (a_furthest_pt_dist * a_rot_diff + b_furthest_pt_dist * b_rot_diff)
+    // cancel each other out
 
-    double delta = abs(dist) / vel_bound;
-    t += delta;
+    // double vel_bound = d_normalized.dot(v_step) + 
+    //   a_furthest_pt_dist * a_rot_diff + b_furthest_pt_dist * b_rot_diff;
+    // double delta = abs(dist) / vel_bound;
+    // t += delta;
+
+    // bilateral adv
+    // since we're using seperable shapes, 
+    // we're testing for the smallest dist we can go with a discontinuous function
+    auto bilateral_adv = [&](double current_t, const Eigen::Vector3d& d_normalized, double dist_to_cover)
+    {
+      double lower_t_limit = current_t;
+      double upper_t_limit = 1.0f;
+
+      double prev_dist_abs = DBL_MAX;
+      double t_at_prev_dist_abs = current_t;
+      uint bilateral_adv_iter = 0;
+      do
+      {
+        double sample_t = lower_t_limit + 0.5 * (upper_t_limit - lower_t_limit);
+        printf("iter: %d, sample_t: %f\n", bilateral_adv_iter, sample_t);
+
+        Eigen::Vector3d a = a_start + a_vstep * sample_t;
+        Eigen::Vector3d b = b_start + b_vstep * sample_t;
+        double a_rot = a_rot_start + a_rot_diff * sample_t;
+        double b_rot = b_rot_start + b_rot_diff * sample_t;
+
+        double dist_along_vec;
+        fcl::Transform3d a_tx, b_tx;
+        
+        a_tx.setIdentity();
+        a_tx.prerotate(fcl::AngleAxis<double>(a_rot, Eigen::Vector3d::UnitZ()));
+        a_tx.pretranslate(a);
+
+        b_tx.setIdentity();
+        b_tx.prerotate(fcl::AngleAxis<double>(b_rot, Eigen::Vector3d::UnitZ()));
+        b_tx.pretranslate(b);
+        
+        double dist_output = DBL_MAX;
+        // our piecewise distance function
+        for (const auto& a_shape : a_shapes)
+        {
+          auto a_shape_tx = a_tx * a_shape._transform;
+          for (const auto& b_shape : b_shapes)
+          {
+            auto b_shape_tx = b_tx * b_shape._transform;
+            Eigen::Vector3d b_to_a = a_shape_tx.translation() - b_shape_tx.translation();
+            auto b_to_a_norm = b_to_a / b_to_a.norm();
+
+            double dist_along_b_to_a = b_to_a.norm() - (a_shape._radius + b_shape._radius);
+            auto v = dist_along_b_to_a * b_to_a_norm;
+            double dist_along_d = v.dot(d_normalized);
+
+            if (dist_along_d < dist_output)
+              dist_output = dist_along_d;
+
+            if (b_shape._radius == 0.6 && a_shape._radius == 0.6)
+              printf("a2b2 dist: %f\n", dist_along_d);
+          }
+        }
+
+        if (abs(dist_output) > prev_dist_abs)
+        {
+          printf("abs distance increased from the previous sample, reverting to t_at_prev_dist_abs: %f\n", t_at_prev_dist_abs); 
+          return t_at_prev_dist_abs;
+        }
+        prev_dist_abs = abs(dist_output);
+        t_at_prev_dist_abs = sample_t;
+
+        printf("dist_output: %f\n", dist_output);
+        if (abs(dist_output) < tolerance)
+        {
+          printf("minimal dist within tolerance range %f\n", tolerance);
+          return sample_t;
+        }
+        if ((upper_t_limit - lower_t_limit) < tolerance)
+        {
+          printf("range too small\n");
+          return sample_t;
+        }
+        
+        if (dist_output < 0.0)
+          upper_t_limit = sample_t;
+        else if (dist_output > 0.0)
+          lower_t_limit = sample_t;
+
+        ++bilateral_adv_iter;
+      } while (1);
+    };
+
+    t = bilateral_adv(t, d_normalized, dist_along_d_to_cover);
 
     Eigen::Vector3d a = a_start + a_vstep * t;
     Eigen::Vector3d b = b_start + b_vstep * t;
@@ -130,9 +221,10 @@ bool CA_collide_seperable_circles(
     double b_rot = b_rot_start + b_rot_diff * t;
 
     calc_min_dist(a, a_rot, b, b_rot, a_shapes, b_shapes,
-      d, dist);
+      d, dist_along_d_to_cover);
     
-    //printf("vel_bound %f, delta: %f t: %f dist: %f\n", vel_bound, delta, t, dist);
+    // printf("dist_along_d_to_cover: %f\n", dist_along_d_to_cover);
+    // printf("vel_bound %f, delta: %f t: %f dist: %f\n", vel_bound, delta, t, dist);
     ++iter;
     // if (iter > 2)
     //   break;

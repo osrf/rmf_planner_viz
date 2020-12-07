@@ -20,6 +20,7 @@
 
 #include <iostream>
 #include <math.h>
+#include <vector>
 
 #include <rmf_planner_viz/draw/Graph.hpp>
 #include <rmf_planner_viz/draw/Schedule.hpp>
@@ -66,33 +67,40 @@ void draw_fcl_motion(fcl::MotionBase<double>* motion, const sf::Color& color = s
   motion->integrate(0.0); //reset
 }
 
-void draw_robot_on_spline(fcl::MotionBase<double>* motion, double interp, double radius, const sf::Color& color = sf::Color(255, 255, 255, 255))
+void draw_robot_on_spline(fcl::MotionBase<double>* motion, double interp, 
+  const std::vector<rmf_planner_viz::draw::ModelSpaceShape>& shapes,
+  const sf::Color& color = sf::Color(255, 255, 255, 255))
 {
+  if (shapes.empty())
+    return;
   motion->integrate(interp);
   fcl::Transform3d tf;
   motion->getCurrentTransform(tf);
 
-  auto pt = tf.translation();
-  rmf_planner_viz::draw::IMDraw::draw_circle(sf::Vector2f(pt.x(), pt.y()), radius, color);
-  auto linear = tf.linear();
-
-  auto column1 = linear.block<3, 1>(0,0);
-  //ImGui::Text("forward: %f %f", column1.x(), column1.y());
-  auto pt_end = fcl::Vector3d(pt.x() + column1.x(), pt.y() + column1.y(), 0.0);
-  rmf_planner_viz::draw::IMDraw::draw_arrow(sf::Vector2f(pt.x(), pt.y()), sf::Vector2f(pt_end.x(), pt_end.y()), color);
+  for (uint i=0; i<shapes.size(); ++i)
+  {
+    auto tx = tf * shapes[i]._transform;
+    auto pt = tx.translation();
+    rmf_planner_viz::draw::IMDraw::draw_circle(sf::Vector2f(pt.x(), pt.y()), 
+      shapes[i]._radius, color);
+    
+    if (i == 0)
+    {
+      auto linear = tx.linear();
+      auto column1 = linear.block<3, 1>(0,0);
+      //ImGui::Text("forward: %f %f", column1.x(), column1.y());
+      auto pt_end = fcl::Vector3d(pt.x() + column1.x(), pt.y() + column1.y(), 0.0);
+      rmf_planner_viz::draw::IMDraw::draw_arrow(sf::Vector2f(pt.x(), pt.y()), sf::Vector2f(pt_end.x(), pt_end.y()), color);
+    }
+  }
 }
 
-void draw_offset_sidecar_on_spline(fcl::MotionBase<double>* motion, double interp, double radius,
-  const fcl::Transform3d& tx_offset, const sf::Color& color = sf::Color(255, 255, 255, 255))
+enum PRESET_TYPE
 {
-  motion->integrate(interp);
-  fcl::Transform3d tf;
-  motion->getCurrentTransform(tf);
-
-  auto sidecar_tx = tf * tx_offset;
-  auto sidecar_pt = sidecar_tx.translation();
-  rmf_planner_viz::draw::IMDraw::draw_circle(sf::Vector2f(sidecar_pt.x(), sidecar_pt.y()), radius, color);
-}
+  PRESET_LINEAR = 0,
+  PRESET_SPLINEMOTION,
+  PRESET_OTHER
+};
 
 int main()
 {
@@ -146,7 +154,8 @@ int main()
   fcl::Boxd shape_b(0.5, 0.5, 0.0);
   fcl::Boxd shape_b2(0.6, 0.6, 0.0);
   
-  fcl::Transform3d shape_b2_offset;
+  fcl::Transform3d shape_a2_offset, shape_b2_offset;
+  shape_a2_offset.setIdentity();
   shape_b2_offset.setIdentity();
   
   auto shape_b_bvh = std::make_shared<fcl::BVHModel<fcl::OBBRSSd>>();
@@ -284,19 +293,22 @@ int main()
       // ImGui::Text("knots_b[2]: %f %f %f", knots_b[2][0], knots_b[2][1], knots_b[2][2]);
       // ImGui::Text("knots_b[3]: %f %f %f", knots_b[3][0], knots_b[3][1], knots_b[3][2]);
       std::shared_ptr<fcl::MotionBase<double>> motion_a, motion_b;
-      static int current_preset = 3;
+      static int current_preset = 2;
+      PRESET_TYPE preset_type = PRESET_LINEAR;
 
       if (ImGui::Button("Preset #0 (Straight Line vs Stationary)"))
         current_preset = 0;
       if (ImGui::Button("Preset #1 (On the spot rotation vs Stationary)"))
         current_preset = 1;
+      if (ImGui::Button("Preset #2 (2 sidecars rotating and hitting)"))
+        current_preset = 2;
 
       //if (ImGui::Button("Preset #4 (CustomSplineMotion Straight Line vs Stationary)"))
       //if (ImGui::Button("Preset #5 (CustomSplineMotion On the spot rotation vs Stationary)"))
-      if (ImGui::Button("Preset #2 (CustomSplineMotion Arc without rotation vs Stationary)"))
-        current_preset = 2;
-      if (ImGui::Button("Preset #3 (CustomSplineMotion Arc with rotation vs Stationary)"))
+      if (ImGui::Button("Preset #3 (CustomSplineMotion Arc without rotation vs Stationary)"))
         current_preset = 3;
+      if (ImGui::Button("Preset #4 (CustomSplineMotion Arc with rotation vs Stationary)"))
+        current_preset = 4;
       
       if (ImGui::Button("Preset #99 (trianglemesh (not working))"))
         current_preset = 99;
@@ -306,6 +318,7 @@ int main()
       std::vector<ModelSpaceShape> b_shapes;
       if (current_preset == 0)
       {
+        preset_type = PRESET_LINEAR;
         a_shapes.emplace_back(identity, 0.5);
         b_shapes.emplace_back(identity, 0.5);
 
@@ -333,6 +346,7 @@ int main()
       }
       else if (current_preset == 1)
       {
+        preset_type = PRESET_LINEAR;
         a_shapes.emplace_back(identity, 0.5);
         b_shapes.emplace_back(identity, 0.5);
 
@@ -367,6 +381,48 @@ int main()
       }
       else if (current_preset == 2)
       {
+        preset_type = PRESET_LINEAR;
+        a_shapes.emplace_back(identity, 0.5);
+        b_shapes.emplace_back(identity, 0.5);
+
+        shape_a2_offset.setIdentity();
+        shape_a2_offset.pretranslate(Eigen::Vector3d(0, -1.0, 0));
+        a_shapes.emplace_back(shape_a2_offset, 0.6);
+
+        shape_b2_offset.setIdentity();
+        shape_b2_offset.pretranslate(Eigen::Vector3d(0, -1.0, 0));
+        b_shapes.emplace_back(shape_b2_offset, 0.6);
+        
+        a_start = Eigen::Vector3d(0, 0, 0);
+        a_end = Eigen::Vector3d(0, 0, 0);
+        a_rot_start = 0.0;
+        a_rot_end = -EIGEN_PI;
+
+        b_start = Eigen::Vector3d(-3.8, 0, 0);
+        b_end = Eigen::Vector3d(-2.5, 0, 0);
+        b_rot_start = 0;
+        b_rot_end = EIGEN_PI;
+
+        // for rendering
+        Eigen::Vector3d zero(0,0,0);
+        auto knots_a =
+          rmf_planner_viz::draw::compute_knots(
+            Eigen::Vector3d(a_start.x(), a_start.y(), a_rot_start),
+            Eigen::Vector3d(a_end.x(), a_end.y(), a_rot_end),
+            zero, zero);
+        auto knots_b =
+          rmf_planner_viz::draw::compute_knots(
+            Eigen::Vector3d(b_start.x(), b_start.y(), b_rot_start), 
+            Eigen::Vector3d(b_end.x(), b_end.y(), b_rot_end), 
+            zero, zero);
+
+        motion_a = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_a));
+        motion_b = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_b));
+      }
+      // custom spline
+      else if (current_preset == 3)
+      {
+        preset_type = PRESET_SPLINEMOTION;
         shape_b2_offset.setIdentity();
         shape_b2_offset.pretranslate(Eigen::Vector3d(1, 0.0, 0));
 
@@ -381,8 +437,9 @@ int main()
         motion_a = std::make_shared<CustomSplineMotion>(to_customspline(knots_a));
         motion_b = std::make_shared<CustomSplineMotion>(to_customspline(knots_b)); 
       }
-      else if (current_preset == 3)
+      else if (current_preset == 4)
       {
+        preset_type = PRESET_SPLINEMOTION;
         shape_b2_offset.setIdentity();
         shape_b2_offset.pretranslate(Eigen::Vector3d(0, -1.0, 0));
 
@@ -399,6 +456,7 @@ int main()
       }
       else if (current_preset == 99)
       {
+        preset_type = PRESET_OTHER;
         shape_b2_offset.setIdentity();
         shape_b2_offset.pretranslate(Eigen::Vector3d(0, -1.0, 0));
 
@@ -417,10 +475,11 @@ int main()
       ImGui::Separator();
       ImGui::Text("Preset: %d", current_preset);
 
-      sf::Color toi_color(3, 125, 88);
+      sf::Color toi_green_color(3, 125, 88);
+      sf::Color toi_red_color(178, 34, 34);
 
       // collision
-      if (current_preset >= 0 && current_preset <= 1)
+      if (preset_type == PRESET_LINEAR)
       {
         double toi = 0.0;
         bool collide = CA_collide_seperable_circles(
@@ -431,14 +490,14 @@ int main()
         if (collide)
         {
           ImGui::Text("Collide! TOI: %f", toi);
-          draw_robot_on_spline(motion_b.get(), toi, circle_shape->get_characteristic_length(), toi_color);
-          draw_offset_sidecar_on_spline(motion_b.get(), toi, circle_shape_ex->get_characteristic_length(), shape_b2_offset, toi_color);
+          draw_robot_on_spline(motion_a.get(), toi, a_shapes, toi_red_color);
+          draw_robot_on_spline(motion_b.get(), toi, b_shapes, toi_green_color);
         }
         else
           ImGui::Text("No collision");
 
       }
-      else if (current_preset >= 2 && current_preset <= 3)
+      else if (preset_type == PRESET_SPLINEMOTION)
       {
         double toi = 0.0;
         bool collide = CA_collide_seperable_circles(
@@ -449,13 +508,13 @@ int main()
         if (collide)
         {
           ImGui::Text("Collide! TOI: %f", toi);
-          draw_robot_on_spline(motion_b.get(), toi, circle_shape->get_characteristic_length(), toi_color);
-          draw_offset_sidecar_on_spline(motion_b.get(), toi, circle_shape_ex->get_characteristic_length(), shape_b2_offset, toi_color);
+          draw_robot_on_spline(motion_a.get(), toi, a_shapes, toi_red_color);
+          draw_robot_on_spline(motion_b.get(), toi, b_shapes, toi_green_color);
         }
         else
           ImGui::Text("No collision");
       }
-      else if (current_preset == 99)
+      else
       {
         const auto obj_a = fcl::ContinuousCollisionObject<double>(shape_a, motion_a);
         const auto obj_b = fcl::ContinuousCollisionObject<double>(shape_b_bvh, motion_b);
@@ -487,16 +546,19 @@ int main()
         draw_fcl_motion(motion_a.get(), sf::Color::Red);
         draw_fcl_motion(motion_b.get(), sf::Color::Green);
 
-        draw_robot_on_spline(motion_a.get(), interp, circle_shape->get_characteristic_length(), sf::Color::Red);
-        draw_robot_on_spline(motion_b.get(), interp, circle_shape->get_characteristic_length(), sf::Color::Green);
-
-        draw_offset_sidecar_on_spline(motion_b.get(), interp, circle_shape_ex->get_characteristic_length(), shape_b2_offset, sf::Color::Green);
+        draw_robot_on_spline(motion_a.get(), interp, a_shapes, sf::Color::Red);
+        draw_robot_on_spline(motion_b.get(), interp, b_shapes, sf::Color::Green);
       }
     }
+
+    static bool draw_axis = false;
+    ImGui::Checkbox("draw axis", &draw_axis);
+
     ImGui::End();
     ImGui::EndFrame();
 
-    IMDraw::draw_axis();
+    if (draw_axis)
+      IMDraw::draw_axis();
     
     app_window.clear();
     app_window.setView(view);
