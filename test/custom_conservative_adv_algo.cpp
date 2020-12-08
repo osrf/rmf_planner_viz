@@ -141,7 +141,7 @@ bool collide_seperable_circles(
       double prev_dist_abs = DBL_MAX;
       double t_at_prev_dist_abs = current_t;
       uint bilateral_adv_iter = 0;
-      do
+      for (;;)
       {
         double sample_t = lower_t_limit + 0.5 * (upper_t_limit - lower_t_limit);
         printf("iter: %d, sample_t: %f\n", bilateral_adv_iter, sample_t);
@@ -187,13 +187,13 @@ bool collide_seperable_circles(
           }
         }
 
-        if (abs(dist_diff_output) > prev_dist_abs)
-        {
-          printf("abs distance increased from the previous sample, reverting to t_at_prev_dist_abs: %f\n", t_at_prev_dist_abs); 
-          return t_at_prev_dist_abs;
-        }
-        prev_dist_abs = abs(dist_diff_output);
-        t_at_prev_dist_abs = sample_t;
+        // if (abs(dist_diff_output) > prev_dist_abs)
+        // {
+        //   printf("abs distance increased from the previous sample, reverting to t_at_prev_dist_abs: %f\n", t_at_prev_dist_abs); 
+        //   return t_at_prev_dist_abs;
+        // }
+        // prev_dist_abs = abs(dist_diff_output);
+        // t_at_prev_dist_abs = sample_t;
 
         printf("dist_output: %f\n", dist_diff_output);
         if (abs(dist_diff_output) < tolerance)
@@ -201,11 +201,19 @@ bool collide_seperable_circles(
           printf("minimal dist within tolerance range %f\n", tolerance);
           return sample_t;
         }
-        if ((upper_t_limit - lower_t_limit) < tolerance)
+
+        // our window is too small and we're hopping around, so we stop.
+        // Also, this is what box2d does.
+        if (bilateral_adv_iter >= 25) 
         {
           printf("range too small\n");
           return sample_t;
         }
+        // if ((upper_t_limit - lower_t_limit) < tolerance)
+        // {
+        //   printf("range too small\n");
+        //   return sample_t;
+        // }
         
         if (dist_diff_output < 0.0)
           upper_t_limit = sample_t;
@@ -213,7 +221,7 @@ bool collide_seperable_circles(
           lower_t_limit = sample_t;
 
         ++bilateral_adv_iter;
-      } while (1);
+      }
     };
 
     t = bilateral_adv(t, d_normalized, dist_along_d_to_cover);
@@ -303,13 +311,13 @@ static double max_splinemotion_advancement(double current_t,
       }
     }
 
-    if (abs(dist_diff_output) > prev_dist_abs)
-    {
-      printf("abs distance increased from the previous sample, reverting to t_at_prev_dist_abs: %f\n", t_at_prev_dist_abs); 
-      return t_at_prev_dist_abs;
-    }
-    prev_dist_abs = abs(dist_diff_output);
-    t_at_prev_dist_abs = sample_t;
+    // if (abs(dist_diff_output) > prev_dist_abs)
+    // {
+    //   printf("abs distance increased from the previous sample, reverting to t_at_prev_dist_abs: %f\n", t_at_prev_dist_abs); 
+    //   return t_at_prev_dist_abs;
+    // }
+    // prev_dist_abs = abs(dist_diff_output);
+    // t_at_prev_dist_abs = sample_t;
 
     printf("dist_output: %f\n", dist_diff_output);
     if (abs(dist_diff_output) < tolerance)
