@@ -28,7 +28,7 @@
 namespace rmf_planner_viz {
 namespace draw {
 
-bool CA_collide_seperable_circles(
+bool collide_seperable_circles(
   Eigen::Vector3d a_start, Eigen::Vector3d a_end, double a_rot_start, double a_rot_end,
   Eigen::Vector3d b_start, Eigen::Vector3d b_end, double b_rot_start, double b_rot_end,
   const std::vector<ModelSpaceShape>& a_shapes,
@@ -246,43 +246,129 @@ bool CA_collide_seperable_circles(
   return false;
 }
 
-bool CA_collide_seperable_circles(
-  CustomSplineMotion motion_a, double a_radius,
-  CustomSplineMotion motion_b, double b_radius,
-  fcl::Transform3d b2_offset, double b2_radius,
+static double max_splinemotion_advancement(double current_t,
+  fcl::SplineMotion<double>& motion_a, 
+  fcl::SplineMotion<double>& motion_b,
+  const std::vector<ModelSpaceShape>& a_shapes,
+  const std::vector<ModelSpaceShape>& b_shapes,
+  const Eigen::Vector3d& d_normalized, double dist_to_cover,
+  double tolerance)
+{
+  //find point (or t) that is <= dist_along_d
+  //use bisection method. 
+  double lower_t_limit = current_t;
+  double upper_t_limit = 1.0;
+  
+  double prev_dist_abs = DBL_MAX;
+  double t_at_prev_dist_abs = current_t;
+  uint bilateral_adv_iter = 0;
+  
+  for (;;)
+  {
+    double sample_t = lower_t_limit + 0.5 * (upper_t_limit - lower_t_limit);
+    printf("picked t: %f\n", sample_t);
+
+    // integrate
+    motion_a.integrate(sample_t);
+    motion_b.integrate(sample_t);
+
+    fcl::Transform3d a_tx, b_tx;
+
+    motion_a.getCurrentTransform(a_tx);
+    motion_b.getCurrentTransform(b_tx);
+
+    double dist_diff_output = DBL_MAX;
+    // our piecewise distance function
+    for (const auto& a_shape : a_shapes)
+    {
+      auto a_shape_tx = a_tx * a_shape._transform;
+      for (const auto& b_shape : b_shapes)
+      {
+        auto b_shape_tx = b_tx * b_shape._transform;
+        Eigen::Vector3d b_to_a = a_shape_tx.translation() - b_shape_tx.translation();
+        auto b_to_a_norm = b_to_a / b_to_a.norm();
+
+        double dist_along_b_to_a = b_to_a.norm() - (a_shape._radius + b_shape._radius);
+        auto v = dist_along_b_to_a * b_to_a_norm;
+        double dist_along_d = v.dot(d_normalized);
+
+        double dist_diff = dist_along_d - dist_to_cover;
+        
+        // get the minimum
+        if (dist_diff < dist_diff_output)
+          dist_diff_output = dist_along_d;
+
+        // if (b_shape._radius == 0.6 && a_shape._radius == 0.6)
+        //   printf("a2b2 dist: %f\n", dist_along_d);
+      }
+    }
+
+    if (abs(dist_diff_output) > prev_dist_abs)
+    {
+      printf("abs distance increased from the previous sample, reverting to t_at_prev_dist_abs: %f\n", t_at_prev_dist_abs); 
+      return t_at_prev_dist_abs;
+    }
+    prev_dist_abs = abs(dist_diff_output);
+    t_at_prev_dist_abs = sample_t;
+
+    printf("dist_output: %f\n", dist_diff_output);
+    if (abs(dist_diff_output) < tolerance)
+    {
+      printf("minimal dist within tolerance range %f\n", tolerance);
+      return sample_t;
+    }
+
+    // our window is too small and we're hopping around, so we stop.
+    // Also, this is what box2d does.
+    if (bilateral_adv_iter >= 25) 
+    {
+      printf("range too small\n");
+      return sample_t;
+    }
+    
+    if (dist_diff_output < 0.0)
+      upper_t_limit = sample_t;
+    else if (dist_diff_output > 0.0)
+      lower_t_limit = sample_t;
+
+    ++bilateral_adv_iter;
+  }
+
+  return current_t;
+}
+
+bool collide_seperable_circles(
+  fcl::SplineMotion<double>& motion_a, 
+  fcl::SplineMotion<double>& motion_b,
+  const std::vector<ModelSpaceShape>& a_shapes,
+  const std::vector<ModelSpaceShape>& b_shapes,
   double& impact_time, double tolerance)
 {
   auto calc_min_dist = [](
-    fcl::Transform3d a_tf, double a_radius, 
-    fcl::Transform3d b_tf, double b_radius,
-    fcl::Transform3d b2_offset, double b2_radius,
-    Eigen::Vector3d& d, double& dist)
+    const fcl::Transform3d& a_tx,
+    const fcl::Transform3d& b_tx,
+    const std::vector<ModelSpaceShape>& a_shapes,
+    const std::vector<ModelSpaceShape>& b_shapes,
+    Eigen::Vector3d& d, double& min_dist)
   {
-    Eigen::Vector3d a = a_tf.translation();
-    Eigen::Vector3d b = b_tf.translation();
-    
-    auto b2_tx = b_tf * b2_offset;
-    Eigen::Vector3d b2 = b2_tx.translation();
-    std::cout << "b2:\n" << b2 << std::endl;
-    
-    Eigen::Vector3d b_to_a = a - b;
-    double b_to_a_dist = b_to_a.norm();
-    double d1 = b_to_a_dist - (a_radius + b_radius);
+    if (a_shapes.empty() || b_shapes.empty())
+      return false;
+    min_dist = DBL_MAX;
+    for (const auto& a_shape : a_shapes)
+    {
+      auto a_shape_tx = a_tx * a_shape._transform;
 
-    Eigen::Vector3d b2_to_a = a - b2;
-    double b2_to_a_dist = b2_to_a.norm();
-    double d2 = b2_to_a_dist - (a_radius + b2_radius);
-    if (d1 < d2)
-    {
-      printf("b is closer (dist: %f)\n", d1);
-      dist = d1;
-      d = b_to_a;
-    }
-    else
-    {
-      printf("b2 is closer (dist: %f)\n", d2);
-      dist = d2;
-      d = b2_to_a;
+      for (const auto& b_shape : b_shapes)
+      {
+        auto b_shape_tx = b_tx * b_shape._transform;
+        Eigen::Vector3d b_to_a = a_shape_tx.translation() - b_shape_tx.translation();
+        double dist = b_to_a.norm() - (a_shape._radius + b_shape._radius);
+        if (dist < min_dist)
+        {
+          min_dist = dist;
+          d = b_to_a;
+        }
+      }
     }
   };
 
@@ -303,44 +389,25 @@ bool CA_collide_seperable_circles(
   motion_b.getCurrentTransform(b_tf);
   auto b_end = b_tf.translation();
 
-  double dist = 0.0;
+  double dist_along_d_to_cover = 0.0;
   Eigen::Vector3d d(0,0,0);
-  calc_min_dist(a_start_tf, a_radius, b_start_tf, b_radius,
-    b2_offset, b2_radius, d, dist);
+  calc_min_dist(a_start_tf, b_start_tf, a_shapes, b_shapes,
+    d, dist_along_d_to_cover);
 
   motion_a.integrate(0.0);
   motion_b.integrate(0.0);
   
   double t = 0.0;
   uint iter = 0;
-  while (dist > tolerance && t < 1.0)
+  while (dist_along_d_to_cover > tolerance && t < 1.0)
   {
     printf("======= iter:%d\n", iter);
     Eigen::Vector3d d_normalized = d.normalized();
 
-    // double vel_bound = d_normalized.dot(v_step) + 
-    //   a_furthest_pt_dist * a_rot_diff + b_furthest_pt_dist * b_rot_diff;
-    //double vel_bound = motion_b.computeTBound(d_normalized) + a_furthest_pt_dist * a_rot_diff + b_furthest_pt_dist * b_rot_diff;
-    //printf("vel_bound: %f\n", vel_bound);
-
     std::cout << "d_norm: \n" << d_normalized << std::endl;
-    double t_bound = 0.0;
-    motion_b.computeTBoundBilateralAdv(d_normalized, dist, b2_offset, t_bound);
 
-    // fcl::Transform3d offset_tx;
-    // offset_tx.setIdentity();
-    //double tbound_mainshape = 0.0;
-    // printf("start mainshape\n");
-    // motion_b.computeTBoundBilateralAdv(d_normalized, dist, offset_tx, tbound_mainshape);
-    // printf("tbound_mainshape: %f\n", tbound_mainshape);
-
-    // printf("start offsetshape\n");
-    // double tbound_offsetshape = 0.0;
-    // motion_b.computeTBoundBilateralAdv(d_normalized, dist, b2_offset, tbound_offsetshape);
-    // printf("tbound_offsetshape: %f\n", tbound_offsetshape);
-    
-    //t = std::min(tbound_mainshape, tbound_offsetshape);
-    t = t_bound;
+    t = max_splinemotion_advancement(t, motion_a, motion_b, a_shapes, b_shapes, 
+      d_normalized, dist_along_d_to_cover, tolerance);
     printf("t: %f\n", t);
 
     motion_a.integrate(t);
@@ -351,9 +418,8 @@ bool CA_collide_seperable_circles(
     motion_a.getCurrentTransform(a_tf);
     motion_b.getCurrentTransform(b_tf);
 
-    calc_min_dist(a_tf, a_radius, b_tf, b_radius,
-      b2_offset, b2_radius,
-      d, dist);
+    calc_min_dist(a_tf, b_tf, a_shapes, b_shapes,
+      d, dist_along_d_to_cover);
     
     //printf("vel_bound %f, delta: %f t: %f dist: %f\n", vel_bound, delta, t, dist);
     ++iter;
