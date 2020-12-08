@@ -262,18 +262,30 @@ static double max_splinemotion_advancement(double current_t,
   const Eigen::Vector3d& d_normalized, double dist_to_cover,
   double tolerance)
 {
-  //find point (or t) that is <= dist_along_d
-  //use bisection method. 
+  assert(tolerance >= 0.0);
+  
+  // alternate between bisection and false position methods
   double lower_t_limit = current_t;
   double upper_t_limit = 1.0;
-  
-  double prev_dist_abs = DBL_MAX;
-  double t_at_prev_dist_abs = current_t;
   uint bilateral_adv_iter = 0;
   
+  double s1 = dist_to_cover, s2 = dist_to_cover;
+
   for (;;)
   {
-    double sample_t = lower_t_limit + 0.5 * (upper_t_limit - lower_t_limit);
+    double sample_t = 0.0;
+    if (bilateral_adv_iter & 1) 
+    {
+      // use false position method
+      // solve for t where (t, tolerance) for a line with 
+      // endpoints (lower_t_limit, s1) and (upper_t_limit, s2)
+      // where s2 is negative and s1 is positive
+      double inv_m = (upper_t_limit - lower_t_limit) / (s2 - s1);
+      sample_t = lower_t_limit + (tolerance - s1) * inv_m;
+    }
+    else // bisection method
+      sample_t = lower_t_limit + 0.5 * (upper_t_limit - lower_t_limit);
+    
     printf("picked t: %f\n", sample_t);
 
     // integrate
@@ -285,7 +297,7 @@ static double max_splinemotion_advancement(double current_t,
     motion_a.getCurrentTransform(a_tx);
     motion_b.getCurrentTransform(b_tx);
 
-    double dist_diff_output = DBL_MAX;
+    double s = DBL_MAX;
     // our piecewise distance function
     for (const auto& a_shape : a_shapes)
     {
@@ -303,24 +315,16 @@ static double max_splinemotion_advancement(double current_t,
         double dist_diff = dist_along_d - dist_to_cover;
         
         // get the minimum
-        if (dist_diff < dist_diff_output)
-          dist_diff_output = dist_along_d;
+        if (dist_diff < s)
+          s = dist_along_d;
 
         // if (b_shape._radius == 0.6 && a_shape._radius == 0.6)
         //   printf("a2b2 dist: %f\n", dist_along_d);
       }
     }
 
-    // if (abs(dist_diff_output) > prev_dist_abs)
-    // {
-    //   printf("abs distance increased from the previous sample, reverting to t_at_prev_dist_abs: %f\n", t_at_prev_dist_abs); 
-    //   return t_at_prev_dist_abs;
-    // }
-    // prev_dist_abs = abs(dist_diff_output);
-    // t_at_prev_dist_abs = sample_t;
-
-    printf("dist_output: %f\n", dist_diff_output);
-    if (abs(dist_diff_output) < tolerance)
+    printf("dist_output: %f\n", s);
+    if (abs(s) < tolerance)
     {
       printf("minimal dist within tolerance range %f\n", tolerance);
       return sample_t;
@@ -334,11 +338,16 @@ static double max_splinemotion_advancement(double current_t,
       return sample_t;
     }
     
-    if (dist_diff_output < 0.0)
+    if (s > 0.0)
+    {
       upper_t_limit = sample_t;
-    else if (dist_diff_output > 0.0)
+      s2 = s;
+    }
+    else if (s < 0.0)
+    {
       lower_t_limit = sample_t;
-
+      s1 = s;
+    }
     ++bilateral_adv_iter;
   }
 

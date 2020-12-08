@@ -492,7 +492,7 @@ int main()
 
         Eigen::Vector3d zero(0,0,0);
         auto knots_a =
-          rmf_planner_viz::draw::compute_knots(Eigen::Vector3d(-2, -3, 0), Eigen::Vector3d(-2, 3, 0),
+          rmf_planner_viz::draw::compute_knots(Eigen::Vector3d(-1, -3, 0), Eigen::Vector3d(-1, 3, 0),
                         Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 0, 0));
         auto knots_b =
           rmf_planner_viz::draw::compute_knots(Eigen::Vector3d(-3, 0, 0), Eigen::Vector3d(3, 0, 0),
@@ -579,6 +579,9 @@ int main()
       ImGui::Text("Tolerance: %f", tolerance);
       ImGui::Separator();
 
+      static bool draw_toi_shapes = true;
+      ImGui::Checkbox("Draw TOI shapes", &draw_toi_shapes);
+
       sf::Color toi_green_color(3, 125, 88);
       sf::Color toi_red_color(178, 34, 34);
 
@@ -594,8 +597,11 @@ int main()
         if (collide)
         {
           ImGui::Text("Collide! TOI: %f", toi);
-          draw_robot_on_spline(motion_a.get(), toi, a_shapes, toi_red_color);
-          draw_robot_on_spline(motion_b.get(), toi, b_shapes, toi_green_color);
+          if (draw_toi_shapes)
+          {
+            draw_robot_on_spline(motion_a.get(), toi, a_shapes, toi_red_color);
+            draw_robot_on_spline(motion_b.get(), toi, b_shapes, toi_green_color);
+          }
         }
         else
           ImGui::Text("No collision");
@@ -612,8 +618,11 @@ int main()
         if (collide)
         {
           ImGui::Text("Collide! TOI: %f", toi);
-          draw_robot_on_spline(motion_a.get(), toi, a_shapes, toi_red_color);
-          draw_robot_on_spline(motion_b.get(), toi, b_shapes, toi_green_color);
+          if (draw_toi_shapes)
+          {
+            draw_robot_on_spline(motion_a.get(), toi, a_shapes, toi_red_color);
+            draw_robot_on_spline(motion_b.get(), toi, b_shapes, toi_green_color);
+          }
         }
         else
           ImGui::Text("No collision");
