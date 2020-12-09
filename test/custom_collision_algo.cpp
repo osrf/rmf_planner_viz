@@ -16,7 +16,7 @@
  *
 */
 
-#include "custom_conservative_adv_algo.hpp"
+#include "custom_collision_algo.hpp"
 
 #include <SFML/Graphics.hpp>
 #include <imgui.h>
@@ -75,31 +75,9 @@ bool collide_seperable_circles(
       }
     }
   };
-  auto get_furthest_point_dist = [](
-    Eigen::Vector3d start, double rot_start,
-    const std::vector<ModelSpaceShape>& shapes)
-  {
-    fcl::Transform3d tx;
-    
-    tx.setIdentity();
-    tx.prerotate(fcl::AngleAxis<double>(rot_start, Eigen::Vector3d::UnitZ()));
-    tx.pretranslate(start);
-
-    double d = 0.0;
-    for (const auto& shape : shapes)
-    {
-      auto shape_tx = tx * shape._transform;
-
-      double furthest_dist = (shape_tx.translation() - start).norm() + shape._radius;
-      if (furthest_dist > d)
-        d = furthest_dist;
-    }
-    return d;
-  };
 
   Eigen::Vector3d a_vstep = a_end - a_start;
   Eigen::Vector3d b_vstep = b_end - b_start;
-  Eigen::Vector3d v_step = b_vstep - a_vstep;
 
   double dist_along_d_to_cover = 0.0;
   Eigen::Vector3d d(0,0,0);
@@ -109,7 +87,7 @@ bool collide_seperable_circles(
   double a_rot_diff = a_rot_end - a_rot_start;
   double b_rot_diff = b_rot_end - b_rot_start;
 
-  double prev_min_dist = DBL_MAX;
+  //double prev_min_dist = DBL_MAX;
   double t = 0.0;
   uint iter = 0;
   while (dist_along_d_to_cover > tolerance && t < 1.0)
@@ -135,8 +113,6 @@ bool collide_seperable_circles(
       double lower_t_limit = current_t;
       double upper_t_limit = 1.0f;
 
-      double prev_dist_abs = DBL_MAX;
-      double t_at_prev_dist_abs = current_t;
       uint bilateral_adv_iter = 0;
       for (;;)
       {
@@ -150,7 +126,6 @@ bool collide_seperable_circles(
         double a_rot = a_rot_start + a_rot_diff * sample_t;
         double b_rot = b_rot_start + b_rot_diff * sample_t;
 
-        double dist_along_vec;
         fcl::Transform3d a_tx, b_tx;
         
         a_tx.setIdentity();
@@ -214,7 +189,7 @@ bool collide_seperable_circles(
     double a_rot = a_rot_start + a_rot_diff * t;
     double b_rot = b_rot_start + b_rot_diff * t;
 
-    prev_min_dist = dist_along_d_to_cover;
+    //prev_min_dist = dist_along_d_to_cover;
     calc_min_dist(a, a_rot, b, b_rot, a_shapes, b_shapes,
       d, dist_along_d_to_cover);
     
@@ -355,6 +330,9 @@ bool collide_seperable_circles(
   const std::vector<ModelSpaceShape>& b_shapes,
   double& impact_time, uint& dist_checks, uint safety_maximum_checks, double tolerance)
 {
+  if (a_shapes.empty() || b_shapes.empty())
+    return false;
+
   auto calc_min_dist = [](
     const fcl::Transform3d& a_tx,
     const fcl::Transform3d& b_tx,
@@ -362,8 +340,6 @@ bool collide_seperable_circles(
     const std::vector<ModelSpaceShape>& b_shapes,
     Eigen::Vector3d& d, double& min_dist)
   {
-    if (a_shapes.empty() || b_shapes.empty())
-      return false;
     min_dist = DBL_MAX;
     for (const auto& a_shape : a_shapes)
     {
@@ -389,24 +365,12 @@ bool collide_seperable_circles(
   motion_a.integrate(0.0);
   motion_b.integrate(0.0);
   motion_a.getCurrentTransform(a_start_tf);
-  auto a_start = a_start_tf.translation();
   motion_b.getCurrentTransform(b_start_tf);
-  auto b_start = b_start_tf.translation();
-
-  motion_a.integrate(1.0);
-  motion_b.integrate(1.0);
-  motion_a.getCurrentTransform(a_tf);
-  auto a_end = a_tf.translation();
-  motion_b.getCurrentTransform(b_tf);
-  auto b_end = b_tf.translation();
 
   double dist_along_d_to_cover = 0.0;
   Eigen::Vector3d d(0,0,0);
   calc_min_dist(a_start_tf, b_start_tf, a_shapes, b_shapes,
     d, dist_along_d_to_cover);
-
-  motion_a.integrate(0.0);
-  motion_b.integrate(0.0);
   
   double t = 0.0;
   uint iter = 0;

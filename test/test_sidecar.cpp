@@ -38,7 +38,7 @@
 
 #include "imgui-SFML.h"
 #include "spline_offset_utils.hpp"
-#include "custom_conservative_adv_algo.hpp"
+#include "custom_collision_algo.hpp"
 #include <cpuid.h>
 #include <x86intrin.h>
 
