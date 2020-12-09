@@ -21,7 +21,7 @@ Test Programs:
 - test_trajectory, test_spline: spline testing utilitis
 (Require fcl 0.6)
 - test_fcl_spline: spline drawing using fcl SplineMotion parameters
-- test_fcl_spline_offset: Sidecar collision test using modified ccd algorithm to account for an offset transform. Also spline approximation experiments.
+- test_fcl_spline_offset: Spline approximation experiments
 - test_sidecar: CCD with bilateral advancement algorithm, also experimental triangle mesh ccd solution.
 
 --
