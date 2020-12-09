@@ -18,8 +18,10 @@ Then you can start running interactive tests in the `./build/rmf_planner_viz/` d
 
 Test Programs:
 - simple_test: Visual AStar planner debugger
-- test_trajectory, test_spline: spline testing utilitis
-(Require fcl 0.6)
+- test_trajectory, test_spline: spline testing utilities
+
+(Requires fcl 0.6)
+
 - test_fcl_spline: spline drawing using fcl SplineMotion parameters
 - test_fcl_spline_offset: Spline approximation experiments
 - test_sidecar: CCD with bilateral advancement algorithm, also experimental triangle mesh ccd solution.
