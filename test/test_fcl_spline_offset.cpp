@@ -311,34 +311,6 @@ int main()
       // Collision using the original spline and apply offset transform to each iteration
       // of the gjk algorithm. (FAILING)
       {
-        const auto obj_a = fcl::ContinuousCollisionObject<double>(shape_a, motion_a);
-        const auto obj_b = fcl::ContinuousCollisionObject<double>(shape_b, motion_b);
-        const auto obj_b2 = fcl::ContinuousCollisionObject<double>(shape_b2, motion_b);
-
-        fcl::ContinuousCollisionRequest<double> request;
-        request.ccd_solver_type = fcl::CCDC_CONSERVATIVE_ADVANCEMENT;
-        request.gjk_solver_type = fcl::GST_INDEP;
-
-        // reset the motions
-        motion_a->integrate(0.0);
-        motion_b->integrate(0.0);
-
-        // test for collision
-        fcl::Transform3d identity_offset;
-        identity_offset.setIdentity();
-        fcl::ContinuousCollisionResultd result;
-        collide_shapes_with_offset<double>(
-          obj_a.collisionGeometry().get(), obj_a.getMotion(), identity_offset,
-          obj_b2.collisionGeometry().get(), obj_b2.getMotion(), shape_b2_offset,
-          result);
-          
-        ImGui::Text("collide_shapes_with_offset results:");
-        if (result.is_collide)
-          ImGui::Text("Collide! TOI: %f", result.time_of_contact);
-        else
-          ImGui::Text("No collision");
-        ImGui::Separator();
-
         // draw motions of both splines
         draw_fcl_splinemotion(*motion_a, sf::Color::Red);
         draw_fcl_splinemotion(*motion_b, dark_green_color);
