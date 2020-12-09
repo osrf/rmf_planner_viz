@@ -54,7 +54,8 @@ bool collide_seperable_circles(
   fcl::SplineMotion<double>& motion_b,
   const std::vector<ModelSpaceShape>& a_shapes,
   const std::vector<ModelSpaceShape>& b_shapes,
-  double& impact_time, double tolerance = 0.001);
+  double& impact_time, uint& dist_checks, 
+  uint safety_maximum_checks = 120, double tolerance = 0.001);
 
 
 } // namespace draw

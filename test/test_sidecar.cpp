@@ -252,7 +252,7 @@ int main()
       // ImGui::Text("knots_b[2]: %f %f %f", knots_b[2][0], knots_b[2][1], knots_b[2][2]);
       // ImGui::Text("knots_b[3]: %f %f %f", knots_b[3][0], knots_b[3][1], knots_b[3][2]);
       std::shared_ptr<fcl::MotionBase<double>> motion_a, motion_b;
-      static int current_preset = 2;
+      static int current_preset = 5;
       PRESET_TYPE preset_type = PRESET_LINEAR;
 
       ImGui::Text("Linearly interpolated");
@@ -415,7 +415,6 @@ int main()
           preset_type = PRESET_LINEAR;
         else
           preset_type = PRESET_SPLINEMOTION;
-        preset_type = PRESET_LINEAR;
         a_shapes.emplace_back(identity, 0.5);
         b_shapes.emplace_back(identity, 0.5);
 
@@ -512,7 +511,7 @@ int main()
         shape_b2_offset.pretranslate(Eigen::Vector3d(1, 0.0, 0));
         b_shapes.emplace_back(shape_b2_offset, 0.6);
 
-        tolerance = 0.01;
+        tolerance = 0.1;
 
         auto knots_a =
           rmf_planner_viz::draw::compute_knots(Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 0, 0),
@@ -610,11 +609,12 @@ int main()
       else if (preset_type == PRESET_SPLINEMOTION)
       {
         double toi = 0.0;
+        uint dist_checks = 0;
         bool collide = collide_seperable_circles(
           *(fcl::SplineMotion<double>*)motion_a.get(),
           *(fcl::SplineMotion<double>*)motion_b.get(),
           a_shapes, b_shapes,
-          toi, (double)tolerance);
+          toi, dist_checks, 120, (double)tolerance);
         if (collide)
         {
           ImGui::Text("Collide! TOI: %f", toi);
@@ -626,6 +626,7 @@ int main()
         }
         else
           ImGui::Text("No collision");
+        ImGui::Text("Distance checks: %d", dist_checks);
       }
       else
       {
