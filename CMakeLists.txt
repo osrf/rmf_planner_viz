@@ -13,7 +13,6 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rmf_traffic REQUIRED)
 find_package(SFML COMPONENTS graphics window system REQUIRED)
-find_package(SFGUI)
 find_package(ImGui-SFML)
 
 include(GNUInstallDirs)
@@ -59,7 +58,7 @@ target_link_libraries(
     ImGui-SFML::ImGui-SFML
 )
 
-add_executable(test_spline 
+add_executable(test_spline
   test/test_spline.cpp
   )
 
@@ -77,7 +76,7 @@ if(fcl_FOUND)
   set(FCL_LIBRARIES fcl)
   message(STATUS "Using FCL version: ${FCL_VERSION}")
 
-  add_executable(test_fcl_spline 
+  add_executable(test_fcl_spline
     test/test_fcl_spline.cpp
   )
 
@@ -88,7 +87,7 @@ if(fcl_FOUND)
       ImGui-SFML::ImGui-SFML
       fcl
   )
-  
+
   add_executable(test_fcl_spline_offset
     test/test_fcl_spline_offset.cpp
     test/spline_offset_utils.cpp
