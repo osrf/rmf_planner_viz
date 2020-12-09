@@ -38,6 +38,8 @@
 #include "imgui-SFML.h"
 #include "spline_offset_utils.hpp"
 #include "custom_conservative_adv_algo.hpp"
+#include <cpuid.h>
+#include <x86intrin.h>
 
 void draw_fcl_motion(fcl::MotionBase<double>* motion, const sf::Color& color = sf::Color(255, 255, 255, 255))
 {
@@ -608,6 +610,11 @@ int main()
       }
       else if (preset_type == PRESET_SPLINEMOTION)
       {
+        int cpuid_var[4] { 0, 0, 0, 0 };
+        int v = 0;
+        __cpuid(v,v,v,v,v);
+        uint64_t start = __rdtsc();
+
         double toi = 0.0;
         uint dist_checks = 0;
         bool collide = collide_seperable_circles(
@@ -615,6 +622,9 @@ int main()
           *(fcl::SplineMotion<double>*)motion_b.get(),
           a_shapes, b_shapes,
           toi, dist_checks, 120, (double)tolerance);
+
+        uint64_t end = __rdtsc();
+
         if (collide)
         {
           ImGui::Text("Collide! TOI: %f", toi);
@@ -626,6 +636,7 @@ int main()
         }
         else
           ImGui::Text("No collision");
+        ImGui::Text("Clock cycles: %010llu", end - start);
         ImGui::Text("Distance checks: %d", dist_checks);
       }
       else
