@@ -159,117 +159,122 @@ void do_planner_debug(
   ImGui::Separator();
 
   trajectories_to_render.clear();
-  /// AStar Node details  
+  /// AStar Node details
+  auto searchqueue = progress.queue();
+  auto& container = get_priority_queue_container(searchqueue);
+
+  ImGui::TextColored(ImVec4(0, 1, 0, 1), "AStar Node Count: %lu", container.size());
+  ImGui::NewLine();
+
+  if (ImGui::ListBoxHeader("AStar Nodes"))
+  {
+    for (uint i=0; i<container.size(); ++i)
+    {
+      auto& node = container[i];
+      char node_name[32] = { 0 };
+      snprintf(node_name, sizeof(node_name), "Node %d (score: %f)",
+        i, node->current_cost + node->remaining_cost_estimate);
+      if (ImGui::Selectable(node_name, (int)i == selected_node_idx))
+        selected_node_idx = i;
+    }
+    ImGui::ListBoxFooter();
+  }
+
   if (current_plan)
-  {      
-    auto searchqueue = progress.queue();
-    auto& container = get_priority_queue_container(searchqueue);
-
-    ImGui::TextColored(ImVec4(0, 1, 0, 1), "AStar Node Count: %lu", container.size());
-    ImGui::NewLine();
-
-    if (ImGui::ListBoxHeader("AStar Nodes"))
-    {
-      for (uint i=0; i<container.size(); ++i)
-      {
-        auto& node = container[i];
-        char node_name[32] = { 0 };
-        snprintf(node_name, sizeof(node_name), "Node %d (score: %f)",
-          i, node->current_cost + node->remaining_cost_estimate);
-        if (ImGui::Selectable(node_name, (int)i == selected_node_idx))
-          selected_node_idx = i;
-      }
-      ImGui::ListBoxFooter();
-    }
-    
-    ImGui::NewLine();
-    ImGui::Separator();
-    if (selected_node_idx != -1 && selected_node_idx < (int)container.size())
-    {
-      ImGui::TextColored(ImVec4(0, 1, 0, 1), "Node #%d Inspection", selected_node_idx);
-      auto selected_node = container[selected_node_idx];
-      ImGui::Text("Current Cost: %f", selected_node->current_cost);
-      ImGui::Text("Remaining Cost Estimate: %f", selected_node->remaining_cost_estimate);
-      if (selected_node->waypoint)
-        ImGui::Text("Waypoint: %lu", *selected_node->waypoint);
-      if (selected_node->start_set_index)
-        ImGui::Text("start_set_index: %lu", *selected_node->start_set_index);
-      
-      const rmf_traffic::Route& route = selected_node->route_from_parent;
-      if (route.trajectory().start_time())
-        ImGui::Text("Node Traj start time: %ld",  route.trajectory().start_time()->time_since_epoch().count());
-      if (route.trajectory().finish_time())
-        ImGui::Text("Node Traj finish time: %ld", route.trajectory().finish_time()->time_since_epoch().count());
-      ImGui::Text("Node Traj duration: %f", rmf_traffic::time::to_seconds(route.trajectory().duration()));
-
-      ImGui::NewLine();
-
-      rmf_traffic::Time start_timestamp = *route.trajectory().start_time();
-      rmf_traffic::Time finish_timestamp = *route.trajectory().finish_time();
-      
-      int parent_count = 0;
-      std::string parent_waypoint_str = "Parent waypoints idx: [";
-      auto parent_node = selected_node->parent;
-      while (parent_node)
-      {
-        auto& route_p = parent_node->route_from_parent;
-        auto route_start_time = route_p.trajectory().start_time();
-        if (route_start_time && start_timestamp > *route_start_time)
-          start_timestamp = *route_start_time;
-        auto route_fin_time = route_p.trajectory().finish_time();
-        if (route_fin_time && finish_timestamp < *route_fin_time)
-          finish_timestamp = *route_fin_time;
-        
-        if (parent_node->waypoint)
-          parent_waypoint_str += std::to_string(*parent_node->waypoint);
-        else
-          parent_waypoint_str += "?";
-        parent_waypoint_str += ", ";
-        parent_node = parent_node->parent;
-        ++parent_count;
-      }
-      ImGui::Text("Parent count: %d", parent_count);
-      parent_waypoint_str += "]";
-      ImGui::Text("%s", parent_waypoint_str.c_str());
-
-      // submit trajectories to draw
-      static bool render_parent_trajectories = false;
-      ImGui::Checkbox("Render Parent Trajectories", &render_parent_trajectories);
-
-      auto trajectory_start_time = rmf_traffic::time::apply_offset(
-        plan_start_timing, timeline_control_value);
-        
-      auto add_trajectory_to_render = [trajectory_start_time, &profile](
-        std::vector<rmf_planner_viz::draw::Trajectory>& to_render,
-        rmf_traffic::agv::Planner::Debug::ConstNodePtr node)
-      {
-        const rmf_traffic::Route& route = node->route_from_parent;
-        const auto& traj = route.trajectory();
-        auto trajectory = rmf_planner_viz::draw::Trajectory(traj, 
-          profile, trajectory_start_time, std::nullopt, sf::Color::Green, { 0.0, 0.0 }, 0.5f);
-        to_render.push_back(trajectory);
-      };
-      add_trajectory_to_render(trajectories_to_render, selected_node);
-      
-      if (render_parent_trajectories)
-      {
-        parent_node = selected_node->parent;
-        while (parent_node)
-        {
-          add_trajectory_to_render(trajectories_to_render, parent_node);
-          parent_node = parent_node->parent;
-        }
-      }
-
-      auto diff = finish_timestamp - start_timestamp;
-      auto max_duration = rmf_traffic::time::to_seconds(diff);
-      if (timeline_control_value > max_duration)
-        timeline_control_value = max_duration;
-      ImGui::SliderFloat("Timeline Control", &timeline_control_value, 0.0f, max_duration);
-    }
+  {
+    ImGui::TextColored(ImVec4(0, 1, 0, 1),
+                       "Plan is available! TODO: Click here to display it");
   }
   else
+  {
     ImGui::TextColored(ImVec4(0, 1, 0, 1), "Current plan not available");
+  }
+
+  ImGui::NewLine();
+  ImGui::Separator();
+  if (selected_node_idx != -1 && selected_node_idx < (int)container.size())
+  {
+    ImGui::TextColored(ImVec4(0, 1, 0, 1), "Node #%d Inspection", selected_node_idx);
+    auto selected_node = container[selected_node_idx];
+    ImGui::Text("Current Cost: %f", selected_node->current_cost);
+    ImGui::Text("Remaining Cost Estimate: %f", selected_node->remaining_cost_estimate);
+    if (selected_node->waypoint)
+      ImGui::Text("Waypoint: %lu", *selected_node->waypoint);
+    if (selected_node->start_set_index)
+      ImGui::Text("start_set_index: %lu", *selected_node->start_set_index);
+
+    const rmf_traffic::Route& route = selected_node->route_from_parent;
+    if (route.trajectory().start_time())
+      ImGui::Text("Node Traj start time: %ld",  route.trajectory().start_time()->time_since_epoch().count());
+    if (route.trajectory().finish_time())
+      ImGui::Text("Node Traj finish time: %ld", route.trajectory().finish_time()->time_since_epoch().count());
+    ImGui::Text("Node Traj duration: %f", rmf_traffic::time::to_seconds(route.trajectory().duration()));
+
+    ImGui::NewLine();
+
+    rmf_traffic::Time start_timestamp = *route.trajectory().start_time();
+    rmf_traffic::Time finish_timestamp = *route.trajectory().finish_time();
+
+    int parent_count = 0;
+    std::string parent_waypoint_str = "Parent waypoints idx: [";
+    auto parent_node = selected_node->parent;
+    while (parent_node)
+    {
+      auto& route_p = parent_node->route_from_parent;
+      auto route_start_time = route_p.trajectory().start_time();
+      if (route_start_time && start_timestamp > *route_start_time)
+        start_timestamp = *route_start_time;
+      auto route_fin_time = route_p.trajectory().finish_time();
+      if (route_fin_time && finish_timestamp < *route_fin_time)
+        finish_timestamp = *route_fin_time;
+
+      if (parent_node->waypoint)
+        parent_waypoint_str += std::to_string(*parent_node->waypoint);
+      else
+        parent_waypoint_str += "?";
+      parent_waypoint_str += ", ";
+      parent_node = parent_node->parent;
+      ++parent_count;
+    }
+    ImGui::Text("Parent count: %d", parent_count);
+    parent_waypoint_str += "]";
+    ImGui::Text("%s", parent_waypoint_str.c_str());
+
+    // submit trajectories to draw
+    static bool render_parent_trajectories = false;
+    ImGui::Checkbox("Render Parent Trajectories", &render_parent_trajectories);
+
+    auto trajectory_start_time = rmf_traffic::time::apply_offset(
+      plan_start_timing, timeline_control_value);
+
+    auto add_trajectory_to_render = [trajectory_start_time, &profile](
+      std::vector<rmf_planner_viz::draw::Trajectory>& to_render,
+      rmf_traffic::agv::Planner::Debug::ConstNodePtr node)
+    {
+      const rmf_traffic::Route& route = node->route_from_parent;
+      const auto& traj = route.trajectory();
+      auto trajectory = rmf_planner_viz::draw::Trajectory(traj,
+        profile, trajectory_start_time, std::nullopt, sf::Color::Green, { 0.0, 0.0 }, 0.5f);
+      to_render.push_back(trajectory);
+    };
+    add_trajectory_to_render(trajectories_to_render, selected_node);
+
+    if (render_parent_trajectories)
+    {
+      parent_node = selected_node->parent;
+      while (parent_node)
+      {
+        add_trajectory_to_render(trajectories_to_render, parent_node);
+        parent_node = parent_node->parent;
+      }
+    }
+
+    auto diff = finish_timestamp - start_timestamp;
+    auto max_duration = rmf_traffic::time::to_seconds(diff);
+    if (timeline_control_value > max_duration)
+      timeline_control_value = max_duration;
+    ImGui::SliderFloat("Timeline Control", &timeline_control_value, 0.0f, max_duration);
+  }
 
   ImGui::End();
 }
