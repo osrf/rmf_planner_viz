@@ -25,6 +25,8 @@
 
 #include "imgui-SFML.h"
 
+//#define DO_LOGGING 1
+
 namespace rmf_planner_viz {
 namespace draw {
 
@@ -105,12 +107,7 @@ bool collide_seperable_circles(
     d, dist_along_d_to_cover);
 
   double a_rot_diff = a_rot_end - a_rot_start;
-  double a_furthest_pt_dist = get_furthest_point_dist(a_start, a_rot_start, a_shapes);
-
   double b_rot_diff = b_rot_end - b_rot_start;
-  double b_furthest_pt_dist = get_furthest_point_dist(b_start, b_rot_start, b_shapes);
-  //printf("a:%f b:%f\n", a_furthest_pt_dist, b_furthest_pt_dist);
-  //printf("adiff:%f bdiff:%f\n", a_rot_diff, b_rot_diff);
 
   double prev_min_dist = DBL_MAX;
   double t = 0.0;
@@ -144,7 +141,9 @@ bool collide_seperable_circles(
       for (;;)
       {
         double sample_t = lower_t_limit + 0.5 * (upper_t_limit - lower_t_limit);
+#ifdef DO_LOGGING
         printf("iter: %d, sample_t: %f\n", bilateral_adv_iter, sample_t);
+#endif
 
         Eigen::Vector3d a = a_start + a_vstep * sample_t;
         Eigen::Vector3d b = b_start + b_vstep * sample_t;
@@ -181,19 +180,8 @@ bool collide_seperable_circles(
             
             if (dist_diff < dist_diff_output)
               dist_diff_output = dist_along_d;
-
-            // if (b_shape._radius == 0.6 && a_shape._radius == 0.6)
-            //   printf("a2b2 dist: %f\n", dist_along_d);
           }
         }
-
-        // if (abs(dist_diff_output) > prev_dist_abs)
-        // {
-        //   printf("abs distance increased from the previous sample, reverting to t_at_prev_dist_abs: %f\n", t_at_prev_dist_abs); 
-        //   return t_at_prev_dist_abs;
-        // }
-        // prev_dist_abs = abs(dist_diff_output);
-        // t_at_prev_dist_abs = sample_t;
 
         // printf("dist_output: %f\n", dist_diff_output);
         if (abs(dist_diff_output) < tolerance)
@@ -209,12 +197,7 @@ bool collide_seperable_circles(
           // printf("range too small\n");
           return sample_t;
         }
-        // if ((upper_t_limit - lower_t_limit) < tolerance)
-        // {
-        //   printf("range too small\n");
-        //   return sample_t;
-        // }
-        
+
         if (dist_diff_output < 0.0)
           upper_t_limit = sample_t;
         else if (dist_diff_output > 0.0)
@@ -272,8 +255,10 @@ static double max_splinemotion_advancement(double current_t,
   double sample_t = 0.0;
   for (;;)
   {
-    // if (bilateral_adv_iter < 3)
-    //   printf("#1: (%f,%f) #2: (%f,%f)\n", lower_t_limit, s1, upper_t_limit, s2);
+#ifdef DO_LOGGING
+    if (bilateral_adv_iter < 3)
+      printf("#1: (%f,%f) #2: (%f,%f)\n", lower_t_limit, s1, upper_t_limit, s2);
+#endif
     
     // alternate between bisection and false position methods
     if (bilateral_adv_iter & 1/* && ((s1 < 0.0 && s2 > 0.0) || (s1 > 0.0 && s2 < 0.0))*/)
@@ -287,8 +272,9 @@ static double max_splinemotion_advancement(double current_t,
     }
     else // bisection method
       sample_t = lower_t_limit + 0.5 * (upper_t_limit - lower_t_limit);
-    
-    // printf("iteration: %d picked t: %f\n", bilateral_adv_iter, sample_t);
+#ifdef DO_LOGGING
+    printf("iteration: %d picked t: %f\n", bilateral_adv_iter, sample_t);
+#endif
 
     // integrate
     motion_a.integrate(sample_t);
@@ -324,10 +310,14 @@ static double max_splinemotion_advancement(double current_t,
       }
     }
 
-    //printf("dist_output: %f\n", s);
+#ifdef DO_LOGGING
+    printf("dist_output: %f\n", s);
+#endif
     if (abs(s) < tolerance)
     {
+#ifdef DO_LOGGING
       printf("minimal dist %f within tolerance range %f\n", s, tolerance);
+#endif
       break;
     }
 
@@ -335,7 +325,9 @@ static double max_splinemotion_advancement(double current_t,
     // Also, this is what box2d does.
     if (bilateral_adv_iter >= 25) 
     {
+#ifdef DO_LOGGING
       printf("range too small\n");
+#endif
       break;
     }
     
@@ -420,14 +412,18 @@ bool collide_seperable_circles(
   uint iter = 0;
   while (dist_along_d_to_cover > tolerance && t < 1.0)
   {
-    printf("======= iter:%d\n", iter);
-    Eigen::Vector3d d_normalized = d.normalized();
 
+    Eigen::Vector3d d_normalized = d.normalized();
+#ifdef DO_LOGGING
+    printf("======= iter:%d\n", iter);
     std::cout << "d_norm: \n" << d_normalized << std::endl;
+#endif
 
     t = max_splinemotion_advancement(t, motion_a, motion_b, a_shapes, b_shapes, 
       d_normalized, dist_along_d_to_cover, dist_checks, tolerance);
-    printf("t: %f\n", t);
+#ifdef DO_LOGGING
+    printf("max_splinemotion_advancement returns t: %f\n", t);
+#endif
 
     motion_a.integrate(t);
     motion_b.integrate(t);
@@ -439,21 +435,24 @@ bool collide_seperable_circles(
       d, dist_along_d_to_cover);
     
     ++dist_checks;
-    //printf("vel_bound %f, delta: %f t: %f dist: %f\n", vel_bound, delta, t, dist);
     ++iter;
 
-    //infinite loop prevention. you should increase 
-    if (dist_checks > safety_maximum_checks) 
+    //infinite loop prevention. you should increase safety_maximum_checks if you still want a solution
+    if (dist_checks > safety_maximum_checks)
       break;
   }
   
   if (t >= 0.0 && t < 1.0)
   {
     impact_time = t;
+#ifdef DO_LOGGING
     printf("time of impact: %f\n", t);
+#endif
     return true;
   }
+#ifdef DO_LOGGING
   printf("no collide\n");
+#endif
   return false;
 }
 
