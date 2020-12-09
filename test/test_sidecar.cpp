@@ -37,12 +37,14 @@
 #include <fcl/geometry/geometric_shape_to_BVH_model.h>
 
 #include "imgui-SFML.h"
-#include "spline_offset_utils.hpp"
 #include "custom_collision_algo.hpp"
-#include <cpuid.h>
-#include <x86intrin.h>
+#include "spline_offset_utils.hpp"
 
 //#define PROFILING_USE_RDTSC 1
+#ifdef PROFILING_USE_RDTSC
+#include <cpuid.h>
+#include <x86intrin.h>
+#endif
 
 void draw_fcl_motion(fcl::MotionBase<double>* motion, const sf::Color& color = sf::Color(255, 255, 255, 255))
 {

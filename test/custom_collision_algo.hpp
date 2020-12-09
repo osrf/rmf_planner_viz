@@ -62,5 +62,3 @@ bool collide_seperable_circles(
 } // namespace rmf_planner_viz
 
 #endif // RMF_PLANNER_VIZ__DRAW__CUSTOM_CONSERVATIVE_ADV_ALGO_HPP
-
-
