@@ -51,6 +51,7 @@ void do_planner_debug(
   rmf_traffic::agv::Planner& planner,
   std::vector<rmf_traffic::agv::Planner::Start>& starts,
   rmf_traffic::agv::Planner::Goal& goal,
+  std::size_t graph_num_waypoints,
   rmf_traffic::agv::Planner::Debug& debug,
   rmf_traffic::agv::Planner::Debug::Progress& progress,
   const std::chrono::steady_clock::time_point& plan_start_timing, // earliest time the timeline starts from

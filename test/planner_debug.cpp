@@ -36,6 +36,7 @@ void do_planner_debug(
   rmf_traffic::agv::Planner& planner,
   std::vector<rmf_traffic::agv::Planner::Start>& starts,
   rmf_traffic::agv::Planner::Goal& goal,
+  std::size_t graph_num_waypoints,
   rmf_traffic::agv::Planner::Debug& debug,
   rmf_traffic::agv::Planner::Debug::Progress& progress,
   const std::chrono::steady_clock::time_point& plan_start_timing,
@@ -57,23 +58,23 @@ void do_planner_debug(
 
   ImGui::Separator();
   
+  bool reset_planning = false;
   /// Presets, edit you plans here as you please
   if (ImGui::TreeNode("Presets"))
   {
-    bool preset_triggered = false;
     if (ImGui::Button("Preset #0"))
     {
       starts.clear();
       starts.emplace_back(plan_start_timing, 11, 0.0);
       goal = rmf_traffic::agv::Planner::Goal(3);
-      preset_triggered = true;
+      reset_planning = true;
     }
     if (ImGui::Button("Preset #1"))
     {
       starts.clear();
       starts.emplace_back(plan_start_timing, 10, 0.0);
       goal = rmf_traffic::agv::Planner::Goal(3);
-      preset_triggered = true;
+      reset_planning = true;
     }
     if (ImGui::Button("Preset #2"))
     {
@@ -81,14 +82,7 @@ void do_planner_debug(
       starts.emplace_back(plan_start_timing, 9, 0.0);
       starts.emplace_back(plan_start_timing, 11, 0.0);
       goal = rmf_traffic::agv::Planner::Goal(3);
-      preset_triggered = true;
-    }
-    if (preset_triggered)
-    {
-      progress = debug.begin(starts, goal, planner.get_default_options());
-      current_plan.reset();
-      steps = 0;
-      selected_node_idx = -1;
+      reset_planning = true;
     }
     ImGui::TreePop();
   }
@@ -98,26 +92,114 @@ void do_planner_debug(
   /// Current plan details
   if (ImGui::TreeNode("Current Plan"))
   {
-    ImGui::Text("Starts: ");
+    ImGui::Text("-= Starts --");
     for (uint i=0; i<starts.size(); ++i)
     {
-      ImGui::Text("#%d", i);
+      ImGui::PushID(i);
+      ImGui::Text("Start #%d", i);
       ImGui::Text("Time: %ld", starts[i].time().time_since_epoch().count());
-      ImGui::Text("Waypoint: %lu", starts[i].waypoint());
-      ImGui::Text("Orientation: %f", starts[i].orientation());
+
+      ImGuiStyle& style = ImGui::GetStyle();
+      float w = ImGui::CalcItemWidth();
+      float button_sz = ImGui::GetFrameHeight();
+      float spacing = style.ItemInnerSpacing.x;
+      ImGui::PushItemWidth(w - spacing * 2.0f - button_sz * 2.0f);
+
+      auto current_wp = starts[i].waypoint();
+      std::string preview_val = std::to_string(current_wp);
+      if (ImGui::BeginCombo("Waypoint", preview_val.c_str()))
+      {
+        for (std::size_t graph_idx = 0; graph_idx < graph_num_waypoints; ++graph_idx)
+        {
+          bool is_selected = current_wp == graph_idx;
+          std::string val = std::to_string(graph_idx);
+          if (ImGui::Selectable(val.c_str(), is_selected))
+          {
+            if (current_wp != graph_idx)
+              reset_planning = true;
+            starts[i].waypoint(graph_idx);
+          }
+        }
+        ImGui::EndCombo();
+      }
+
+      static double orientation = 0.0;
+      orientation = starts[i].orientation();
+      ImGui::InputDouble("Orientation", &orientation, 0.1);
+      if (orientation != starts[i].orientation())
+      {
+        reset_planning = true;
+        starts[i].orientation(orientation);  
+      }
+
+      ImGui::PopItemWidth();
+      ImGui::PopID();
+    }
+    if (ImGui::Button("Add start.."))
+    {
+      reset_planning = true;
+      starts.emplace_back(plan_start_timing, 0, 0.0);
     }
 
     //goals
     ImGui::NewLine();
-    ImGui::Text("Goal waypoint: %lu", goal.waypoint());
+    ImGui::Text("-- Goal --");
+    
+    auto current_goal_wp = goal.waypoint();
+    std::string preview_val = std::to_string(current_goal_wp);
+    if (ImGui::BeginCombo("Goal Waypoint", preview_val.c_str()))
+    {
+      for (std::size_t graph_idx = 0; graph_idx < graph_num_waypoints; ++graph_idx)
+      {
+        bool is_selected = current_goal_wp == graph_idx;
+        std::string val = std::to_string(graph_idx);
+        if (ImGui::Selectable(val.c_str(), is_selected))
+        {
+          if (current_goal_wp != graph_idx)
+            reset_planning = true;
+          goal.waypoint(graph_idx);
+        }
+      }
+      ImGui::EndCombo();
+    }
+
     if (goal.orientation())
-      ImGui::Text("Goal orientation: %f", *goal.orientation());
+    {
+      static double goal_orientation = 0.0;
+      goal_orientation = *goal.orientation();
+      ImGui::InputDouble("Goal Orientation", &goal_orientation, 0.1);
+      if (goal_orientation != *goal.orientation())
+      {
+        reset_planning = true;
+        goal.orientation(goal_orientation);  
+      }
+      if (ImGui::Button("Any goal orientation"))
+      {
+        goal.any_orientation();
+        reset_planning = true;
+      }
+    }
     else
-      ImGui::Text("No chosen goal orientation");
+    {
+      ImGui::Text("No goal orientation");
+      if (ImGui::Button("Specify goal orientation"))
+      {
+        goal.orientation(0.0);
+        reset_planning = true;
+      }
+    }
     ImGui::TreePop();
   }
   ImGui::Separator();
 
+  if (reset_planning)
+  {
+    progress = debug.begin(starts, goal, planner.get_default_options());
+    current_plan.reset();
+    steps = 0;
+    selected_node_idx = -1;
+  }
+  
   /// AStar plan control
   ImGui::TextColored(ImVec4(0, 1, 0, 1), "AStar plan generation");
   ImGui::TextColored(ImVec4(0, 1, 0, 1), "Steps taken: %d", steps);
@@ -326,7 +408,6 @@ void do_planner_debug(
 
   ImGui::End();
 }
-
 
 } // namespace draw
 } // namespace rmf_planner_viz

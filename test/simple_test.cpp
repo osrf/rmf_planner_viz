@@ -258,7 +258,7 @@ int main()
     static std::vector<rmf_planner_viz::draw::Trajectory> trajectories_to_render;
 
     rmf_planner_viz::draw::do_planner_debug(
-      profile, planner_0, starts, goal, planner_debug, progress, now,
+      profile, planner_0, starts, goal, graph_0.num_waypoints(), planner_debug, progress, now,
       show_node_trajectories, trajectories_to_render);
     
     ImGui::EndFrame();
