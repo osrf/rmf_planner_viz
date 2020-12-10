@@ -43,7 +43,8 @@ void do_planner_debug(
   std::vector<rmf_planner_viz::draw::Trajectory>& trajectories_to_render)
 {
   static rmf_utils::optional<rmf_traffic::agv::Plan> current_plan;
-  static float timeline_control_value = 0.0f;
+  static float node_inspection_timeline_control = 0.0f;
+  static float solved_plan_timeline_control = 0.0f;
   static int steps = 0;
   static int selected_node_idx = -1;
 
@@ -182,8 +183,62 @@ void do_planner_debug(
 
   if (current_plan)
   {
-    ImGui::TextColored(ImVec4(0, 1, 0, 1),
-                       "Plan is available! TODO: Click here to display it");
+    // Display solved plan details
+    ImGui::Separator();
+    ImGui::TextColored(ImVec4(0, 1, 0, 1), "Solved Plan is available!");
+
+    ImGui::Text("Plan cost: %f", current_plan->get_cost());
+    
+    std::string wp_list_txt = "Waypoints: [";
+    for (const auto& wp : current_plan->get_waypoints())
+    {
+      wp_list_txt += std::to_string(*wp.graph_index());
+      wp_list_txt += ",";
+    }
+    wp_list_txt += "]";
+    ImGui::Text("%s", wp_list_txt.c_str());
+
+    // compute a timeline
+    rmf_traffic::Time start_timestamp = plan_start_timing;
+    rmf_traffic::Time finish_timestamp;
+    for (auto route : current_plan->get_itinerary())
+    {
+      const auto& traj = route.trajectory();
+      auto finish = traj.finish_time();
+
+      if (finish && finish_timestamp < *finish)
+        finish_timestamp = *finish;
+    }
+
+    auto diff = finish_timestamp - start_timestamp;
+    auto max_duration = rmf_traffic::time::to_seconds(diff);
+    if (solved_plan_timeline_control > max_duration)
+      solved_plan_timeline_control = max_duration;
+    ImGui::Text("Max duration: %f", max_duration);
+    ImGui::SliderFloat("Solved Plan Timeline Control", &solved_plan_timeline_control, 0.0f, max_duration);
+
+    auto trajectory_start_time = rmf_traffic::time::apply_offset(
+      start_timestamp, solved_plan_timeline_control);
+
+    static bool show_solved_plan = true;
+    ImGui::Checkbox("Show solved plan itinerary", &show_solved_plan);
+    if (show_solved_plan)
+    {
+      for (auto route : current_plan->get_itinerary())
+      {
+        const auto& traj = route.trajectory();
+        auto trajectory = rmf_planner_viz::draw::Trajectory(traj,
+          profile, trajectory_start_time, std::nullopt, sf::Color::Green, { 0.0, 0.0 }, 0.5f);
+        trajectories_to_render.push_back(trajectory);
+      }
+    }
+
+    auto start = current_plan->get_start();
+    ImGui::Text("Start waypoint: %lu", start.waypoint());
+    if (start.lane())
+      ImGui::Text("Start lane: %lu", *start.lane());
+    ImGui::Text("Start time: %ld", start.time().time_since_epoch().count());
+    ImGui::Text("Start orientation: %f", start.orientation());
   }
   else
   {
@@ -241,11 +296,13 @@ void do_planner_debug(
     ImGui::Text("%s", parent_waypoint_str.c_str());
 
     // submit trajectories to draw
+    static bool render_inspected_node_trajectories = false;
+    ImGui::Checkbox("Render Inspected Node Trajectories", &render_inspected_node_trajectories);
     static bool render_parent_trajectories = false;
     ImGui::Checkbox("Render Parent Trajectories", &render_parent_trajectories);
 
     auto trajectory_start_time = rmf_traffic::time::apply_offset(
-      plan_start_timing, timeline_control_value);
+      plan_start_timing, node_inspection_timeline_control);
 
     auto add_trajectory_to_render = [trajectory_start_time, &profile](
       std::vector<rmf_planner_viz::draw::Trajectory>& to_render,
@@ -257,23 +314,27 @@ void do_planner_debug(
         profile, trajectory_start_time, std::nullopt, sf::Color::Green, { 0.0, 0.0 }, 0.5f);
       to_render.push_back(trajectory);
     };
-    add_trajectory_to_render(trajectories_to_render, selected_node);
 
-    if (render_parent_trajectories)
+    if (render_inspected_node_trajectories)
     {
-      parent_node = selected_node->parent;
-      while (parent_node)
+      add_trajectory_to_render(trajectories_to_render, selected_node);
+
+      if (render_parent_trajectories)
       {
-        add_trajectory_to_render(trajectories_to_render, parent_node);
-        parent_node = parent_node->parent;
+        parent_node = selected_node->parent;
+        while (parent_node)
+        {
+          add_trajectory_to_render(trajectories_to_render, parent_node);
+          parent_node = parent_node->parent;
+        }
       }
     }
 
     auto diff = finish_timestamp - start_timestamp;
     auto max_duration = rmf_traffic::time::to_seconds(diff);
-    if (timeline_control_value > max_duration)
-      timeline_control_value = max_duration;
-    ImGui::SliderFloat("Timeline Control", &timeline_control_value, 0.0f, max_duration);
+    if (node_inspection_timeline_control > max_duration)
+      node_inspection_timeline_control = max_duration;
+    ImGui::SliderFloat("Inpsected Node Timeline Control", &node_inspection_timeline_control, 0.0f, max_duration);
   }
 
   ImGui::End();
