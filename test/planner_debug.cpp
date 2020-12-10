@@ -196,7 +196,7 @@ void do_planner_debug(
       wp_list_txt += ",";
     }
     wp_list_txt += "]";
-    ImGui::Text(wp_list_txt.c_str());
+    ImGui::Text("%s", wp_list_txt.c_str());
 
     // compute a timeline
     rmf_traffic::Time start_timestamp = plan_start_timing;
@@ -204,7 +204,6 @@ void do_planner_debug(
     for (auto route : current_plan->get_itinerary())
     {
       const auto& traj = route.trajectory();
-      auto start = traj.start_time();
       auto finish = traj.finish_time();
 
       if (finish && finish_timestamp < *finish)
@@ -235,9 +234,9 @@ void do_planner_debug(
     }
 
     auto start = current_plan->get_start();
-    ImGui::Text("Start waypoint: %llu", start.waypoint());
+    ImGui::Text("Start waypoint: %lu", start.waypoint());
     if (start.lane())
-      ImGui::Text("Start lane: %llu", *start.lane());
+      ImGui::Text("Start lane: %lu", *start.lane());
     ImGui::Text("Start time: %ld", start.time().time_since_epoch().count());
     ImGui::Text("Start orientation: %f", start.orientation());
   }
