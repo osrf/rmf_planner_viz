@@ -64,11 +64,24 @@ void do_planner_debug(
   if (ImGui::TreeNode("Current Plan"))
   {
     ImGui::Text("-= Starts --");
+    
     for (uint i=0; i<starts.size(); ++i)
     {
       ImGui::PushID(i);
       ImGui::Text("Start #%d", i);
-      ImGui::Text("Time: %ld", starts[i].time().time_since_epoch().count());
+
+      auto duration_nano = starts[i].time() - plan_start_timing;
+      auto duration_milli = std::chrono::duration_cast<std::chrono::milliseconds>(duration_nano);
+      
+      static int time_offset = 0;
+      time_offset = duration_milli.count();
+      ImGui::InputInt("Time offset (ms)", &time_offset);
+      if (time_offset != duration_milli.count())
+      {
+        std::chrono::duration<int, std::milli> duration(time_offset);
+        starts[i].time(plan_start_timing + duration);
+        reset_planning = true;
+      }
 
       ImGuiStyle& style = ImGui::GetStyle();
       float w = ImGui::CalcItemWidth();
