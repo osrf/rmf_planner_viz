@@ -40,6 +40,7 @@ void do_planner_debug(
   rmf_traffic::agv::Planner::Debug& debug,
   rmf_traffic::agv::Planner::Debug::Progress& progress,
   const std::chrono::steady_clock::time_point& plan_start_timing,
+  bool force_replan,
   bool& show_node_trajectories,
   std::vector<rmf_planner_viz::draw::Trajectory>& trajectories_to_render)
 {
@@ -49,46 +50,16 @@ void do_planner_debug(
   static int steps = 0;
   static int selected_node_idx = -1;
 
-  ImGui::SetWindowPos(ImVec2(800, 200));
-  ImGui::SetWindowSize(ImVec2(600, 800));
+  ImGui::SetNextWindowPos(ImVec2(800, 100), ImGuiCond_FirstUseEver);
+  ImGui::SetNextWindowSize(ImVec2(600, 600), ImGuiCond_FirstUseEver);
   
-  ImGui::Begin("Planner AStar Debug", nullptr, ImGuiWindowFlags_HorizontalScrollbar);
+  ImGui::Begin("Planner AStar Debug", nullptr, ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_AlwaysAutoResize);
   
   ImGui::Checkbox("Show node trajectories", &show_node_trajectories);
 
   ImGui::Separator();
   
   bool reset_planning = false;
-  /// Presets, edit you plans here as you please
-  if (ImGui::TreeNode("Presets"))
-  {
-    if (ImGui::Button("Preset #0"))
-    {
-      starts.clear();
-      starts.emplace_back(plan_start_timing, 11, 0.0);
-      goal = rmf_traffic::agv::Planner::Goal(3);
-      reset_planning = true;
-    }
-    if (ImGui::Button("Preset #1"))
-    {
-      starts.clear();
-      starts.emplace_back(plan_start_timing, 10, 0.0);
-      goal = rmf_traffic::agv::Planner::Goal(3);
-      reset_planning = true;
-    }
-    if (ImGui::Button("Preset #2"))
-    {
-      starts.clear();
-      starts.emplace_back(plan_start_timing, 9, 0.0);
-      starts.emplace_back(plan_start_timing, 11, 0.0);
-      goal = rmf_traffic::agv::Planner::Goal(3);
-      reset_planning = true;
-    }
-    ImGui::TreePop();
-  }
-  
-  ImGui::Separator();
-
   /// Current plan details
   if (ImGui::TreeNode("Current Plan"))
   {
@@ -145,6 +116,7 @@ void do_planner_debug(
     ImGui::NewLine();
     ImGui::Text("-- Goal --");
     
+    ImGui::PushItemWidth(50.f);
     auto current_goal_wp = goal.waypoint();
     std::string preview_val = std::to_string(current_goal_wp);
     if (ImGui::BeginCombo("Goal Waypoint", preview_val.c_str()))
@@ -162,6 +134,7 @@ void do_planner_debug(
       }
       ImGui::EndCombo();
     }
+    ImGui::PopItemWidth();
 
     if (goal.orientation())
     {
@@ -192,7 +165,7 @@ void do_planner_debug(
   }
   ImGui::Separator();
 
-  if (reset_planning)
+  if (reset_planning || force_replan)
   {
     progress = debug.begin(starts, goal, planner.get_default_options());
     current_plan.reset();
@@ -407,6 +380,44 @@ void do_planner_debug(
   }
 
   ImGui::End();
+}
+
+bool do_planner_presets(
+  std::vector<rmf_traffic::agv::Planner::Start>& starts,
+  rmf_traffic::agv::Planner::Goal& goal,
+  const std::chrono::steady_clock::time_point& plan_start_timing)
+{
+  bool reset = false;
+  ImGui::SetNextWindowPos(ImVec2(800, 120), ImGuiCond_FirstUseEver);
+  ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_FirstUseEver);
+  
+  ImGui::Begin("Presets", nullptr, ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_AlwaysAutoResize);
+  
+  if (ImGui::Button("Preset #0"))
+  {
+    starts.clear();
+    starts.emplace_back(plan_start_timing, 11, 0.0);
+    goal = rmf_traffic::agv::Planner::Goal(3);
+    reset = true;
+  }
+  if (ImGui::Button("Preset #1"))
+  {
+    starts.clear();
+    starts.emplace_back(plan_start_timing, 10, 0.0);
+    goal = rmf_traffic::agv::Planner::Goal(3);
+    reset = true;
+  }
+  if (ImGui::Button("Preset #2"))
+  {
+    starts.clear();
+    starts.emplace_back(plan_start_timing, 9, 0.0);
+    starts.emplace_back(plan_start_timing, 11, 0.0);
+    goal = rmf_traffic::agv::Planner::Goal(3);
+    reset = true;
+  }
+  ImGui::End();
+
+  return reset;
 }
 
 } // namespace draw

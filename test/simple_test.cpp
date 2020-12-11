@@ -257,9 +257,11 @@ int main()
     static bool show_node_trajectories = true;
     static std::vector<rmf_planner_viz::draw::Trajectory> trajectories_to_render;
 
+    bool force_replan = rmf_planner_viz::draw::do_planner_presets(starts, goal, now);
+
     rmf_planner_viz::draw::do_planner_debug(
       profile, planner_0, starts, goal, graph_0.num_waypoints(), planner_debug, progress, now,
-      show_node_trajectories, trajectories_to_render);
+      force_replan, show_node_trajectories, trajectories_to_render);
     
     ImGui::EndFrame();
 
