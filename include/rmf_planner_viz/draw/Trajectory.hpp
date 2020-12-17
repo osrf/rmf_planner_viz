@@ -42,7 +42,8 @@ public:
       rmf_utils::optional<rmf_traffic::Duration> duration,
       sf::Color color,
       Eigen::Vector2d offset,
-      float projection_width);
+      float projection_width,
+      std::optional<rmf_traffic::Time> now = std::nullopt);
 
   const Fit::Bounds& bounds() const;
 

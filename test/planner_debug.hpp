@@ -24,6 +24,8 @@
 
 #include <rmf_planner_viz/draw/Trajectory.hpp>
 
+#include <SFML/Graphics/RenderWindow.hpp>
+
 #include <queue>
 
 namespace rmf_planner_viz {
@@ -46,7 +48,7 @@ S& get_priority_queue_container(std::priority_queue<T, S, C>& queue)
   return HackedQueue::Container(queue);
 }
 
-void do_planner_debug(
+bool do_planner_debug(
   const rmf_traffic::Profile& profile, 
   rmf_traffic::agv::Planner& planner,
   std::vector<rmf_traffic::agv::Planner::Start>& starts,

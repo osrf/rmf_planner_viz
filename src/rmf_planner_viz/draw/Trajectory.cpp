@@ -84,7 +84,8 @@ public:
       const rmf_traffic::Time start,
       std::optional<rmf_traffic::Duration> duration,
       const sf::Color color,
-      const Eigen::Vector2d offset)
+      const Eigen::Vector2d offset,
+      const std::optional<rmf_traffic::Time> now)
   {
     const auto begin_it = trajectory.lower_bound(start);
 
@@ -107,13 +108,29 @@ public:
 
     capsules.reserve(trajectory.size());
 
+    // TODO(MXG): I'm really not sure if this logic is correct at all
+    const auto now_it = [&]()
+    {
+      if (!now.has_value())
+        return interpolate_it;
+
+      assert(start <= now);
+      if (start == now)
+        return interpolate_it;
+
+      const auto t = now.value();
+      if (t < begin_it->time() && begin_it != trajectory.begin())
+        return --rmf_traffic::Trajectory::const_iterator(trajectory.lower_bound(t));
+
+      return interpolate_it;
+    }();
+
     Eigen::Vector3d p;
-    if (interpolate_it != begin_it)
+    if (now_it != begin_it)
     {
       const auto motion =
           rmf_traffic::Motion::compute_cubic_splines(
-            interpolate_it,
-            ++rmf_traffic::Trajectory::const_iterator(begin_it));
+            now_it, ++rmf_traffic::Trajectory::const_iterator(begin_it));
 
       p = motion->compute_position(start);
       const Eigen::Vector2d p_interp = p.block<2,1>(0,0) + offset;
@@ -160,7 +177,8 @@ public:
       const rmf_traffic::Time start,
       std::optional<rmf_traffic::Duration> duration,
       const sf::Color color,
-      const Eigen::Vector2d offset)
+      const Eigen::Vector2d offset,
+      const std::optional<rmf_traffic::Time> now)
   {
     const auto motion = rmf_traffic::Motion::compute_cubic_splines(trajectory);
 
@@ -169,9 +187,10 @@ public:
           start + duration.value() : motion->finish_time();
     const auto begin = motion->start_time();
 
-    if (motion->start_time() <= start && start <= motion->finish_time())
+    const auto t = now.value_or(start);
+    if (motion->start_time() <= t && t <= motion->finish_time())
     {
-      const Eigen::Vector3d p = motion->compute_position(start);
+      const Eigen::Vector3d p = motion->compute_position(t);
       configure_arrow(p, profile.footprint()->get_characteristic_length(), color);
       configure_footprint(p, profile.footprint()->get_characteristic_length());
       configure_vicinity(p, profile.vicinity()->get_characteristic_length());
@@ -204,7 +223,8 @@ public:
       rmf_utils::optional<rmf_traffic::Duration> duration,
       sf::Color color,
       Eigen::Vector2d offset,
-      float width)
+      float width,
+      std::optional<rmf_traffic::Time> now)
     : radius(width/2.0)
   {
     if (trajectory.size() == 0)
@@ -212,24 +232,24 @@ public:
 
     // This is very efficient but only works for straight-line trajectories
 //    efficient_straight_line_drawing(
-//          trajectory, profile, start, duration, color, offset);
+//          trajectory, profile, start, duration, color, offset, now);
 
     accurate_curve_drawing(
-          trajectory, profile, start, duration, color, offset);
+          trajectory, profile, start, duration, color, offset, now);
   }
 };
 
 //==============================================================================
-Trajectory::Trajectory(
-    const rmf_traffic::Trajectory& trajectory,
+Trajectory::Trajectory(const rmf_traffic::Trajectory& trajectory,
     const rmf_traffic::Profile& profile,
     rmf_traffic::Time start,
     rmf_utils::optional<rmf_traffic::Duration> duration,
     sf::Color color,
     Eigen::Vector2d offset,
-    float projection_width)
+    float projection_width,
+    std::optional<rmf_traffic::Time> now)
   : _pimpl(rmf_utils::make_impl<Implementation>(
-      trajectory, profile, start, duration, color, offset, projection_width))
+      trajectory, profile, start, duration, color, offset, projection_width, now))
 {
   // Do nothing
 }

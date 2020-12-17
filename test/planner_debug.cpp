@@ -31,7 +31,7 @@
 namespace rmf_planner_viz {
 namespace draw {
 
-void do_planner_debug(
+bool do_planner_debug(
   const rmf_traffic::Profile& profile, 
   rmf_traffic::agv::Planner& planner,
   std::vector<rmf_traffic::agv::Planner::Start>& starts,
@@ -42,6 +42,7 @@ void do_planner_debug(
   bool& show_node_trajectories,
   std::vector<rmf_planner_viz::draw::Trajectory>& trajectories_to_render)
 {
+  bool take_snapshot = false;
   static rmf_utils::optional<rmf_traffic::agv::Plan> current_plan;
   static float node_inspection_timeline_control = 0.0f;
   static float solved_plan_timeline_control = 0.0f;
@@ -121,10 +122,17 @@ void do_planner_debug(
   /// AStar plan control
   ImGui::TextColored(ImVec4(0, 1, 0, 1), "AStar plan generation");
   ImGui::TextColored(ImVec4(0, 1, 0, 1), "Steps taken: %d", steps);
+
+  if (ImGui::Button("Take snapshot"))
+  {
+    take_snapshot = true;
+  }
+
   if (ImGui::Button("Step forward"))
   {
     current_plan = progress.step();
     ++steps;
+    take_snapshot = true;
   }
   if (ImGui::Button("Step forward until valid plan.."))
   {
@@ -135,6 +143,8 @@ void do_planner_debug(
       current_plan = progress.step();
       ++steps;
     }
+
+    take_snapshot = true;
   }
   
   if (ImGui::TreeNode("Reset/Jump to.."))
@@ -228,7 +238,7 @@ void do_planner_debug(
       {
         const auto& traj = route.trajectory();
         auto trajectory = rmf_planner_viz::draw::Trajectory(traj,
-          profile, trajectory_start_time, std::nullopt, sf::Color::Green, { 0.0, 0.0 }, 0.5f);
+          profile, trajectory_start_time, std::nullopt, sf::Color::Green, { 0.0, 0.0 }, 2.0f, finish_timestamp);
         trajectories_to_render.push_back(trajectory);
       }
     }
@@ -247,6 +257,12 @@ void do_planner_debug(
 
   ImGui::NewLine();
   ImGui::Separator();
+//  if (!container.empty())
+//  {
+//    if (selected_node_idx < 0)
+//      selected_node_idx = 0;
+//  }
+
   if (selected_node_idx != -1 && selected_node_idx < (int)container.size())
   {
     ImGui::TextColored(ImVec4(0, 1, 0, 1), "Node #%d Inspection", selected_node_idx);
@@ -296,22 +312,22 @@ void do_planner_debug(
     ImGui::Text("%s", parent_waypoint_str.c_str());
 
     // submit trajectories to draw
-    static bool render_inspected_node_trajectories = false;
+    static bool render_inspected_node_trajectories = true;
     ImGui::Checkbox("Render Inspected Node Trajectories", &render_inspected_node_trajectories);
-    static bool render_parent_trajectories = false;
+    static bool render_parent_trajectories = true;
     ImGui::Checkbox("Render Parent Trajectories", &render_parent_trajectories);
 
     auto trajectory_start_time = rmf_traffic::time::apply_offset(
       plan_start_timing, node_inspection_timeline_control);
 
-    auto add_trajectory_to_render = [trajectory_start_time, &profile](
+    auto add_trajectory_to_render = [trajectory_start_time, finish_timestamp, &profile](
       std::vector<rmf_planner_viz::draw::Trajectory>& to_render,
       rmf_traffic::agv::Planner::Debug::ConstNodePtr node)
     {
       const rmf_traffic::Route& route = node->route_from_parent;
       const auto& traj = route.trajectory();
       auto trajectory = rmf_planner_viz::draw::Trajectory(traj,
-        profile, trajectory_start_time, std::nullopt, sf::Color::Green, { 0.0, 0.0 }, 0.5f);
+        profile, trajectory_start_time, std::nullopt, sf::Color::Green, { 0.0, 0.0 }, 2.0f, finish_timestamp);
       to_render.push_back(trajectory);
     };
 
@@ -337,7 +353,39 @@ void do_planner_debug(
     ImGui::SliderFloat("Inpsected Node Timeline Control", &node_inspection_timeline_control, 0.0f, max_duration);
   }
 
+  if (current_plan.has_value())
+  {
+    if (selected_node_idx >= 0)
+    {
+      selected_node_idx = -1;
+      take_snapshot = true;
+    }
+  }
+  else if (!container.empty())
+  {
+//    if (selected_node_idx >= 0)
+//    {
+//      take_snapshot = true;
+//      ++selected_node_idx;
+//    }
+
+//    if (selected_node_idx >= (int)container.size())
+//    {
+//      selected_node_idx = 0;
+//      current_plan = progress.step();
+//      ++steps;
+//    }
+
+    if (selected_node_idx >= 0)
+    {
+      take_snapshot = true;
+      current_plan = progress.step();
+      ++steps;
+    }
+  }
+
   ImGui::End();
+  return take_snapshot;
 }
 
 

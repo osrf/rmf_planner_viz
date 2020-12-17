@@ -10,6 +10,7 @@
   <buildtool_depend>ament_cmake</buildtool_depend>
 
   <depend>rmf_traffic</depend>
+  <depend>rmf_fleet_adapter</depend>
   <depend>SFML</depend>
   <depend>imgui_sfml</depend>
   <depend>fcl</depend>

@@ -162,7 +162,8 @@ public:
 
       sf::Vertex v1;
       v1.position = sf::Vector2f(p1.x(), p1.y());
-      v1.color = bidirectional? LaneEntryColor : LaneExitColor;
+//      v1.color = bidirectional? LaneEntryColor : LaneExitColor;
+      v1.color = LaneEntryColor;
 
       Capsule capsule(v0, v1, lane_width/2.0);
       if (bidirectional)

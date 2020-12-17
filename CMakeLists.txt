@@ -12,6 +12,7 @@ endif()
 
 find_package(ament_cmake REQUIRED)
 find_package(rmf_traffic REQUIRED)
+find_package(rmf_fleet_adapter REQUIRED)
 find_package(SFML COMPONENTS graphics window system REQUIRED)
 find_package(ImGui-SFML)
 
@@ -48,6 +49,7 @@ target_link_libraries(
   PUBLIC
     rmf_planning_viz
     ImGui-SFML::ImGui-SFML
+    rmf_fleet_adapter::rmf_fleet_adapter
 )
 
 add_executable(test_trajectory test/test_trajectory.cpp)
