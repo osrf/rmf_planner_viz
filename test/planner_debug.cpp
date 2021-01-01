@@ -32,7 +32,7 @@ namespace rmf_planner_viz {
 namespace draw {
 
 void do_planner_debug(
-  const rmf_traffic::Profile& profile, 
+  const rmf_traffic::Profile& profile,
   rmf_traffic::agv::Planner& planner,
   std::vector<rmf_traffic::agv::Planner::Start>& starts,
   rmf_traffic::agv::Planner::Goal& goal,
@@ -40,7 +40,8 @@ void do_planner_debug(
   rmf_traffic::agv::Planner::Debug::Progress& progress,
   const std::chrono::steady_clock::time_point& plan_start_timing,
   bool& show_node_trajectories,
-  std::vector<rmf_planner_viz::draw::Trajectory>& trajectories_to_render)
+  std::vector<rmf_planner_viz::draw::Trajectory>& trajectories_to_render,
+  Schedule& schedule_drawable)
 {
   static rmf_utils::optional<rmf_traffic::agv::Plan> current_plan;
   static float node_inspection_timeline_control = 0.0f;
@@ -228,9 +229,11 @@ void do_planner_debug(
       {
         const auto& traj = route.trajectory();
         auto trajectory = rmf_planner_viz::draw::Trajectory(traj,
-          profile, trajectory_start_time, std::nullopt, sf::Color::Green, { 0.0, 0.0 }, 0.5f);
+          profile, trajectory_start_time, std::nullopt, sf::Color::Red, { 0.0, 0.0 }, 0.5f);
         trajectories_to_render.push_back(trajectory);
       }
+
+      schedule_drawable.timespan(trajectory_start_time);
     }
 
     auto start = current_plan->get_start();
@@ -258,7 +261,7 @@ void do_planner_debug(
     if (selected_node->start_set_index)
       ImGui::Text("start_set_index: %lu", *selected_node->start_set_index);
 
-    const rmf_traffic::Route& route = selected_node->route_from_parent;
+    const rmf_traffic::Route& route = selected_node->route_from_parent.back();
     if (route.trajectory().start_time())
       ImGui::Text("Node Traj start time: %ld",  route.trajectory().start_time()->time_since_epoch().count());
     if (route.trajectory().finish_time())
@@ -276,10 +279,10 @@ void do_planner_debug(
     while (parent_node)
     {
       auto& route_p = parent_node->route_from_parent;
-      auto route_start_time = route_p.trajectory().start_time();
+      auto route_start_time = route_p.back().trajectory().start_time();
       if (route_start_time && start_timestamp > *route_start_time)
         start_timestamp = *route_start_time;
-      auto route_fin_time = route_p.trajectory().finish_time();
+      auto route_fin_time = route_p.back().trajectory().finish_time();
       if (route_fin_time && finish_timestamp < *route_fin_time)
         finish_timestamp = *route_fin_time;
 
@@ -296,22 +299,24 @@ void do_planner_debug(
     ImGui::Text("%s", parent_waypoint_str.c_str());
 
     // submit trajectories to draw
-    static bool render_inspected_node_trajectories = false;
+    static bool render_inspected_node_trajectories = true;
     ImGui::Checkbox("Render Inspected Node Trajectories", &render_inspected_node_trajectories);
-    static bool render_parent_trajectories = false;
+    static bool render_parent_trajectories = true;
     ImGui::Checkbox("Render Parent Trajectories", &render_parent_trajectories);
 
     auto trajectory_start_time = rmf_traffic::time::apply_offset(
       plan_start_timing, node_inspection_timeline_control);
 
+    schedule_drawable.timespan(trajectory_start_time);
+
     auto add_trajectory_to_render = [trajectory_start_time, &profile](
       std::vector<rmf_planner_viz::draw::Trajectory>& to_render,
       rmf_traffic::agv::Planner::Debug::ConstNodePtr node)
     {
-      const rmf_traffic::Route& route = node->route_from_parent;
+      const rmf_traffic::Route& route = node->route_from_parent.back();
       const auto& traj = route.trajectory();
       auto trajectory = rmf_planner_viz::draw::Trajectory(traj,
-        profile, trajectory_start_time, std::nullopt, sf::Color::Green, { 0.0, 0.0 }, 0.5f);
+        profile, trajectory_start_time, std::nullopt, sf::Color::Red, { 0.0, 0.0 }, 0.5f);
       to_render.push_back(trajectory);
     };
 

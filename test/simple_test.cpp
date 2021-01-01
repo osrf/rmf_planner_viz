@@ -53,82 +53,43 @@ int main()
     profile
   };
 
-  const std::string test_map_name = "test_map";
-  rmf_traffic::agv::Graph graph_0;
-  graph_0.add_waypoint(test_map_name, {0.0, -10.0}); // 0
-  graph_0.add_waypoint(test_map_name, {0.0, -5.0});  // 1
-  graph_0.add_waypoint(test_map_name, {5.0, -5.0}).set_holding_point(true);  // 2
-  graph_0.add_waypoint(test_map_name, {-10.0, 0.0}); // 3
-  graph_0.add_waypoint(test_map_name, {-5.0, 0.0}); // 4
-  graph_0.add_waypoint(test_map_name, {0.0, 0.0}); // 5
-  graph_0.add_waypoint(test_map_name, {5.0, 0.0}); // 6
-  graph_0.add_waypoint(test_map_name, {10.0, 0.0}); // 7
-  graph_0.add_waypoint(test_map_name, {0.0, 5.0}); // 8
-  graph_0.add_waypoint(test_map_name, {5.0, 5.0}).set_holding_point(true); // 9
-  graph_0.add_waypoint(test_map_name, {0.0, 10.0}); // 10
-  graph_0.add_waypoint(test_map_name, {5.0, 10.0}); // 11
-  graph_0.add_waypoint(test_map_name, {-12.0, 10.0}); // 12
-  graph_0.add_key("Interesting Waypoint", 0);
+  using namespace std::chrono_literals;
 
-  /*            0<------------1<------------2
-   *                                        ^
-   *                                        |
-   *  12------------->10----->11            |
-   *                   |      |             |
-   *                   |      v             |
-   *                   8------9             |
-   *                   |      |             |
-   *                   |      |             |
-   *     3------4------5------6------7      3
-   *                   |      |
-   *                   |      |
-   *                   1------2
-   *                   |
-   *                   |
-   *                   0
-   **/
+  const std::string test_map_name = "test_map";
+  rmf_traffic::agv::Graph graph;
+  graph.add_waypoint(test_map_name, {-5, -5}).set_passthrough_point(true); // 0
+  graph.add_waypoint(test_map_name, { 0, -5}).set_passthrough_point(true); // 1
+  graph.add_waypoint(test_map_name, { 5, -5}).set_passthrough_point(true); // 2
+  graph.add_waypoint(test_map_name, {10, -5}).set_passthrough_point(true); // 3
+  graph.add_waypoint(test_map_name, {-5, 0}); // 4
+  graph.add_waypoint(test_map_name, { 0, 0}); // 5
+  graph.add_waypoint(test_map_name, { 5, 0}); // 6
+  graph.add_waypoint(test_map_name, {10, 0}).set_passthrough_point(true); // 7
+  graph.add_waypoint(test_map_name, {10, 4}).set_passthrough_point(true); // 8
+  graph.add_waypoint(test_map_name, { 0, 8}).set_passthrough_point(true); // 9
+  graph.add_waypoint(test_map_name, { 5, 8}).set_passthrough_point(true); // 10
+  graph.add_waypoint(test_map_name, {10, 12}).set_passthrough_point(true); // 11
+  graph.add_waypoint(test_map_name, {12, 12}).set_passthrough_point(true); // 12
 
   auto add_bidir_lane = [&](const std::size_t w0, const std::size_t w1)
     {
-      graph_0.add_lane(w0, w1);
-      graph_0.add_lane(w1, w0);
+      graph.add_lane(w0, w1);
+      graph.add_lane(w1, w0);
     };
 
   add_bidir_lane(0, 1);
   add_bidir_lane(1, 2);
+  add_bidir_lane(2, 3);
   add_bidir_lane(1, 5);
-  add_bidir_lane(2, 6);
-  add_bidir_lane(3, 4);
+  add_bidir_lane(3, 7);
   add_bidir_lane(4, 5);
-  add_bidir_lane(5, 6);
-  add_bidir_lane(6, 7);
-  add_bidir_lane(5, 8);
-  add_bidir_lane(6, 9);
-  add_bidir_lane(8, 9);
-  add_bidir_lane(8, 10);
-  graph_0.add_lane(10, 11);
-  graph_0.add_lane(11, 9);
-  graph_0.add_lane(12, 10);
-
-  rmf_planner_viz::draw::Graph graph_0_drawable(graph_0, 1.0, font);
-
-  rmf_traffic::agv::Graph graph_1;
-  graph_1.add_waypoint(test_map_name, {-5.0, 15.0}); // 0
-  graph_1.add_waypoint(test_map_name, { 5.0, 15.0}); // 1
-  graph_1.add_waypoint(test_map_name, {15.0, 15.0}); // 2
-  graph_1.add_waypoint(test_map_name, {15.0,  0.0}); // 3
-  graph_1.add_lane(1, 0);
-  graph_1.add_lane(2, 1);
-  graph_1.add_lane(3, 2);
-
-  rmf_planner_viz::draw::Graph graph_1_drawable(graph_1, 0.5, font);
+  add_bidir_lane(6, 10);
+  add_bidir_lane(7, 8);
+  add_bidir_lane(9, 10);
+  add_bidir_lane(10, 11);
 
   std::shared_ptr<rmf_traffic::schedule::Database> database =
       std::make_shared<rmf_traffic::schedule::Database>();
-
-  rmf_traffic::agv::Planner planner_0(
-        rmf_traffic::agv::Planner::Configuration(graph_0, traits),
-        rmf_traffic::agv::Planner::Options(nullptr));
 
   /// Setup participants
   auto p0 = rmf_traffic::schedule::make_participant(
@@ -140,77 +101,75 @@ int main()
         },
         database);
 
-  auto p1 = rmf_traffic::schedule::make_participant(
+  auto p_obstacle = rmf_traffic::schedule::make_participant(
         rmf_traffic::schedule::ParticipantDescription{
-          "participant_1",
+          "obstacle",
           "simple_test",
           rmf_traffic::schedule::ParticipantDescription::Rx::Responsive,
           profile
         },
         database);
 
-  auto pa = rmf_traffic::schedule::make_participant(
-        rmf_traffic::schedule::ParticipantDescription{
-          "participant_0",
-          "simple_test",
-          rmf_traffic::schedule::ParticipantDescription::Rx::Responsive,
-          profile
-        },
-        database);
+  const auto default_options = rmf_traffic::agv::Planner::Options{
+    rmf_traffic::agv::ScheduleRouteValidator::make(database, p0.id(), profile)};
 
-  auto pb = rmf_traffic::schedule::make_participant(
-        rmf_traffic::schedule::ParticipantDescription{
-          "participant_0",
-          "simple_test",
-          rmf_traffic::schedule::ParticipantDescription::Rx::Responsive,
-          profile
-        },
-        database);
+  rmf_traffic::agv::Planner planner{
+    rmf_traffic::agv::Planner::Configuration{graph, traits},
+    default_options
+  };
 
-//  auto pc = rmf_traffic::schedule::make_participant(
-//        rmf_traffic::schedule::ParticipantDescription{
-//          "participant_0",
-//          "simple_test",
-//          rmf_traffic::schedule::ParticipantDescription::Rx::Responsive,
-//          profile
-//        },
-//        database);
-
-  auto p2 = rmf_traffic::schedule::make_participant(
-        rmf_traffic::schedule::ParticipantDescription{
-          "participant_2",
-          "simple_test",
-          rmf_traffic::schedule::ParticipantDescription::Rx::Responsive,
-          profile
-        },
-        database);
-
-
-  // set plans for the participants
   const auto now = std::chrono::steady_clock::now();
 
-  std::vector<rmf_traffic::agv::Planner::Start> starts;
-  starts.emplace_back(now, 11, 0.0);
-  // starts.emplace_back(now, 12, 0.0);
-  // starts.emplace_back(now, 10, 0.0);
+  // GIVEN("Goal from 2->12 and obstacle from 9->1")
+  {
+    add_bidir_lane(5, 9);
+//    const auto start = rmf_traffic::agv::Planner::Start(now, 2, 0.0);
+//    const auto goal = rmf_traffic::agv::Planner::Goal(12);
 
-  // p0.set(planner_0.plan(starts[0], 3)->get_itinerary());
-  // p1.set(planner_0.plan(starts[1], 2)->get_itinerary());
-  // p2.set(planner_0.plan(starts[2], 7,
-  //   rmf_traffic::agv::Plan::Options(
-  //   rmf_traffic::agv::ScheduleRouteValidator::make(
-  //       database, p2.id(), p2.description().profile())))->get_itinerary());
+    std::vector<rmf_traffic::Trajectory> obstacles;
 
-  rmf_traffic::agv::Planner::Goal goal(3);
-  rmf_traffic::agv::Planner::Debug planner_debug(planner_0);
+    rmf_traffic::Trajectory obstacle;
+    obstacle.insert(
+      now + 24s,
+      {0.0, 8.0, 0.0},
+      {0.0, 0.0, 0.0});
+    obstacle.insert(
+      now + 50s,
+      {0.0, 0.0, 0.0},
+      {0.0, 0.0, 0.0});
+    obstacle.insert(
+      now + 70s,
+      {0.0, -5.0, 0.0},
+      {0.0, 0.0, 0.0});
+
+    p_obstacle.set({{test_map_name, std::move(obstacle)}});
+
+    // WHEN("Docking must be at 180-degrees")
+    {
+      using namespace rmf_traffic::agv;
+      graph.add_lane(11, {12, Graph::OrientationConstraint::make({M_PI})});
+      graph.add_lane({12, Graph::OrientationConstraint::make({M_PI})}, 11);
+
+      planner = rmf_traffic::agv::Planner{
+        rmf_traffic::agv::Planner::Configuration{graph, traits},
+        default_options
+      };
+    }
+  }
+
+  rmf_planner_viz::draw::Graph graph_drawable(graph, 1.0, font);
+
+  std::vector<rmf_traffic::agv::Planner::Start> start;
+  start.push_back({now, 2, 0.0});
+  auto goal = rmf_traffic::agv::Planner::Goal(12);
+  rmf_traffic::agv::Planner::Debug planner_debug(planner);
   rmf_traffic::agv::Planner::Debug::Progress progress =
-    planner_debug.begin(starts, goal, planner_0.get_default_options());
+    planner_debug.begin({start}, goal, planner.get_default_options());
 
   rmf_planner_viz::draw::Schedule schedule_drawable(
         database, 0.25, test_map_name, now);
 
-  rmf_planner_viz::draw::Fit fit(
-    {graph_0_drawable.bounds(), graph_1_drawable.bounds()}, 0.02);
+  rmf_planner_viz::draw::Fit fit({graph_drawable.bounds()}, 0.02);
 
   sf::RenderWindow app_window(
         sf::VideoMode(1250, 1028),
@@ -246,9 +205,9 @@ int main()
             fit.compute_transform(app_window.getSize()).getInverse()
             * sf::Vector2f(event.mouseButton.x, event.mouseButton.y);
 
-        const auto pick = graph_0_drawable.pick(p.x, p.y);
+        const auto pick = graph_drawable.pick(p.x, p.y);
         if (pick)
-          graph_0_drawable.select(*pick);
+          graph_drawable.select(*pick);
       }
     }
 
@@ -258,20 +217,17 @@ int main()
     static std::vector<rmf_planner_viz::draw::Trajectory> trajectories_to_render;
 
     rmf_planner_viz::draw::do_planner_debug(
-      profile, planner_0, starts, goal, planner_debug, progress, now,
-      show_node_trajectories, trajectories_to_render);
+      profile, planner, {start}, goal, planner_debug, progress, now,
+      show_node_trajectories, trajectories_to_render, schedule_drawable);
     
     ImGui::EndFrame();
 
     /*** drawing ***/
     app_window.clear();
 
-    schedule_drawable.timespan(std::chrono::steady_clock::now());
-
     sf::RenderStates states;
     fit.apply_transform(states.transform, app_window.getSize());
-    app_window.draw(graph_0_drawable, states);
-    app_window.draw(graph_1_drawable, states);
+    app_window.draw(graph_drawable, states);
     app_window.draw(schedule_drawable, states);
     if (show_node_trajectories)
     {
