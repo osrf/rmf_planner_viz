@@ -28,8 +28,24 @@
 
 #include "imgui-SFML.h"
 
+
+#include <iostream>
+
 namespace rmf_planner_viz {
 namespace draw {
+
+const rmf_traffic::Route& get_route(const rmf_traffic::Route& route)
+{
+  return route;
+}
+
+const rmf_traffic::Route& get_route(const std::vector<rmf_traffic::Route>& route)
+{
+  if (!route.empty())
+    return route.back();
+
+  throw std::runtime_error("No routes??");
+}
 
 void do_planner_debug(
   const rmf_traffic::Profile& profile,
@@ -261,7 +277,7 @@ void do_planner_debug(
     if (selected_node->start_set_index)
       ImGui::Text("start_set_index: %lu", *selected_node->start_set_index);
 
-    const rmf_traffic::Route& route = selected_node->route_from_parent.back();
+    const rmf_traffic::Route& route = get_route(selected_node->route_from_parent);
     if (route.trajectory().start_time())
       ImGui::Text("Node Traj start time: %ld",  route.trajectory().start_time()->time_since_epoch().count());
     if (route.trajectory().finish_time())
@@ -278,11 +294,11 @@ void do_planner_debug(
     auto parent_node = selected_node->parent;
     while (parent_node)
     {
-      auto& route_p = parent_node->route_from_parent;
-      auto route_start_time = route_p.back().trajectory().start_time();
+      auto& route_p = get_route(parent_node->route_from_parent);
+      auto route_start_time = route_p.trajectory().start_time();
       if (route_start_time && start_timestamp > *route_start_time)
         start_timestamp = *route_start_time;
-      auto route_fin_time = route_p.back().trajectory().finish_time();
+      auto route_fin_time = route_p.trajectory().finish_time();
       if (route_fin_time && finish_timestamp < *route_fin_time)
         finish_timestamp = *route_fin_time;
 
@@ -313,7 +329,7 @@ void do_planner_debug(
       std::vector<rmf_planner_viz::draw::Trajectory>& to_render,
       rmf_traffic::agv::Planner::Debug::ConstNodePtr node)
     {
-      const rmf_traffic::Route& route = node->route_from_parent.back();
+      const rmf_traffic::Route& route = get_route(node->route_from_parent);
       const auto& traj = route.trajectory();
       auto trajectory = rmf_planner_viz::draw::Trajectory(traj,
         profile, trajectory_start_time, std::nullopt, sf::Color::Red, { 0.0, 0.0 }, 0.5f);
