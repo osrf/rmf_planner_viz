@@ -58,7 +58,6 @@ int main(int argc, char* argv[])
   rmf_traffic::agv::Graph graph_0;
 
   const std::string test_map_name = "test_map";
-  std::cout << "argc: " << argc << std::endl;;
   if (argc == 2)
   {
     std::cout << "Loading map file " << argv[1] << std::endl;
@@ -68,6 +67,7 @@ int main(int argc, char* argv[])
   }
   else // default graph
   {
+    std::cout << "Using default map" << std::endl;
     /*            0<------------1<------------2
     *                                        ^
     *                                        |

@@ -49,7 +49,6 @@ target_link_libraries(
   simple_test
   PUBLIC
     rmf_planning_viz
-    #${rmf_fleet_adapter_LIBRARIES}
     rmf_fleet_adapter::rmf_fleet_adapter
     ImGui-SFML::ImGui-SFML
 )
