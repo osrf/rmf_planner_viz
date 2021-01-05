@@ -102,10 +102,15 @@ public:
       }
       else
         text.setString(std::to_string(waypoint.index()));
-      text.setPosition(waypoint.get_location().x(), waypoint.get_location().y());
+      
+      sf::Vector2f scale(1.f/40.f, -1.f/40.f);
+      text.setScale(scale);
+      
+      sf::FloatRect text_rect = text.getLocalBounds();
+      text.setOrigin(text_rect.width * 0.5f, text_rect.height * 0.5f);
+      text.setPosition(waypoint.get_location().x(), 
+        waypoint.get_location().y());
 
-      //minor scale hack
-      text.setScale(sf::Vector2f(1.f/40.f, -1.f/40.f));
       text.setFillColor(sf::Color(192, 192, 192));
 
       auto& map_data = data[waypoint.get_map_name()];
@@ -465,7 +470,12 @@ void Graph::set_text_size(uint sz)
   {
     auto& map_data = iter.second;
     for (auto& s : map_data.waypoints_text)
+    {
       s.setCharacterSize(sz);
+
+      sf::FloatRect text_rect = s.getLocalBounds();
+      s.setOrigin(text_rect.width * 0.5f, text_rect.height * 0.5f);
+    }
   }
 }
 

@@ -60,7 +60,7 @@ int main(int argc, char* argv[])
   const std::string test_map_name = "test_map";
   if (argc == 2)
   {
-    std::cout << "Loading map file " << argv[1] << std::endl;
+    std::cout << "Loading nav_graph file " << argv[1] << std::endl;
     graph_0 = rmf_fleet_adapter::agv::parse_graph(
       argv[1], 
       traits);
