@@ -1,4 +1,4 @@
-Tools for visualizing the `rmf_core` planner
+# Tools for visualizing the `rmf_core` planner
 
 To build:
 
@@ -29,3 +29,14 @@ Optionally, you can build and run test_fcl_spline by cloning
 https://github.com/ddengster/fcl.git with branch 0.6.1-fix-conservative-adv into your workspace
 
 alternatively, you can use the latest version of https://github.com/flexible-collision-library/fcl 
+
+----
+
+Using the Visual AStar planner debugger
+
+Running ./build/simple_test will use a default nav graph.
+
+To use other nav graphs,
+- Import https://github.com/osrf/rmf_demos and https://github.com/osrf/traffic_editor into your colcon workspace and colcon build it.
+- This will generate the navgraph .yaml files in the build/rmf_demo_maps/maps/<map name>/nav_graphs/*.yaml
+- Run `./build/simple_test ./build/rmf_demo_maps/maps/<map name>/nav_graphs/*.yaml` to load the nav graph
