@@ -125,6 +125,9 @@ int main(int argc, char* argv[])
 
   rmf_planner_viz::draw::Graph graph_0_drawable(graph_0, 1.0, font);
   std::vector<std::string> map_names = graph_0_drawable.get_map_names();
+  std::string chosen_map;
+  if (graph_0_drawable.current_map())
+    chosen_map = *graph_0_drawable.current_map();
   
   std::shared_ptr<rmf_traffic::schedule::Database> database =
       std::make_shared<rmf_traffic::schedule::Database>();
@@ -283,7 +286,10 @@ int main(int argc, char* argv[])
           {
             bool activated = map_names[i] == *graph_0_drawable.current_map();
             if (ImGui::RadioButton(map_names[i].c_str(), activated))
+            {
               graph_0_drawable.choose_map(map_names[i]);
+              chosen_map = map_names[i];
+            }
           }
         }
         ImGui::EndMenu();
@@ -295,7 +301,8 @@ int main(int argc, char* argv[])
     force_replan |= startgoal_force_replan;
 
     rmf_planner_viz::draw::do_planner_debug(
-      profile, planner_0, starts, goal, graph_0.num_waypoints(), planner_debug, progress, plan_start_timing,
+      profile, chosen_map,
+      planner_0, starts, goal, graph_0.num_waypoints(), planner_debug, progress, plan_start_timing,
       force_replan, show_node_trajectories, trajectories_to_render);
     
     ImGui::EndFrame();

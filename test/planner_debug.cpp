@@ -33,6 +33,7 @@ namespace draw {
 
 void do_planner_debug(
   const rmf_traffic::Profile& profile, 
+  const std::string& chosen_map,
   rmf_traffic::agv::Planner& planner,
   std::vector<rmf_traffic::agv::Planner::Start>& starts,
   rmf_traffic::agv::Planner::Goal& goal,
@@ -295,6 +296,8 @@ void do_planner_debug(
       for (auto route : current_plan->get_itinerary())
       {
         const auto& traj = route.trajectory();
+        if (route.map() != chosen_map)
+          continue;
         auto trajectory = rmf_planner_viz::draw::Trajectory(traj,
           profile, trajectory_start_time, std::nullopt, sf::Color::Green, { 0.0, 0.0 }, 0.5f);
         trajectories_to_render.push_back(trajectory);
