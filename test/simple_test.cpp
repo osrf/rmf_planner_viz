@@ -257,12 +257,40 @@ int main(int argc, char* argv[])
         if (pick)
           graph_0_drawable.select(*pick);
       }
+
+      if (event.type == sf::Event::KeyReleased)
+      {
+        if (event.key.code == sf::Keyboard::F1)
+        {
+          for (uint i=0; i<map_names.size(); ++i)
+          {
+            if (map_names[i] != chosen_map)
+              continue;
+            if (i > 0)
+              chosen_map = map_names[i - 1];
+            else
+              chosen_map = map_names[map_names.size() - 1];
+            break;
+          }
+        }
+        if (event.key.code == sf::Keyboard::F2)
+        {
+          for (uint i=0; i<map_names.size(); ++i)
+          {
+            if (map_names[i] != chosen_map)
+              continue;
+            if (i < (map_names.size() - 1))
+              chosen_map = map_names[i + 1];
+            else
+              chosen_map = map_names[0];
+            break;
+          }
+        }
+      }
     }
 
     ImGui::SFML::Update(app_window, deltaClock.restart());
-    
-    static bool show_node_trajectories = true;
-    static std::vector<rmf_planner_viz::draw::Trajectory> trajectories_to_render;
+
 
     bool force_replan = false;
     if (ImGui::BeginMainMenuBar())
@@ -278,24 +306,22 @@ int main(int argc, char* argv[])
         ImGui::Separator();
         ImGui::NewLine();
 
-        if (graph_0_drawable.current_map())
-        {
-          ImGui::Text("Maps");
+        ImGui::Text("Maps (Use keys F1/F2 to iterate through)");
 
-          for (uint i=0; i<map_names.size(); ++i)
-          {
-            bool activated = map_names[i] == *graph_0_drawable.current_map();
-            if (ImGui::RadioButton(map_names[i].c_str(), activated))
-            {
-              graph_0_drawable.choose_map(map_names[i]);
-              chosen_map = map_names[i];
-            }
-          }
+        for (uint i=0; i<map_names.size(); ++i)
+        {
+          bool activated = map_names[i] == chosen_map;
+          if (ImGui::RadioButton(map_names[i].c_str(), activated))
+            chosen_map = map_names[i];
         }
         ImGui::EndMenu();
       }
       ImGui::EndMainMenuBar();
     }
+    graph_0_drawable.choose_map(chosen_map);
+    
+    static bool show_node_trajectories = true;
+    static std::vector<rmf_planner_viz::draw::Trajectory> trajectories_to_render;
 
     bool startgoal_force_replan = rmf_planner_viz::draw::do_planner_presets(starts, goal, plan_start_timing);
     force_replan |= startgoal_force_replan;
