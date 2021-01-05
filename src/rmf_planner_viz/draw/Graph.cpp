@@ -106,7 +106,7 @@ public:
 
       //minor scale hack
       text.setScale(sf::Vector2f(1.f/40.f, -1.f/40.f));
-      text.setFillColor(sf::Color::Cyan);
+      text.setFillColor(sf::Color(192, 192, 192));
 
       auto& map_data = data[waypoint.get_map_name()];
       map_data.waypoints_text.emplace_back(text);
