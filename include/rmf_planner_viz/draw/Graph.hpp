@@ -68,6 +68,9 @@ public:
   rmf_utils::optional<Pick> selected() const;
 
   void set_text_size(uint sz);
+
+  std::vector<std::string> get_map_names();
+
 protected:
 
   void draw(sf::RenderTarget& target, sf::RenderStates states) const final;

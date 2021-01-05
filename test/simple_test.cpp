@@ -124,7 +124,8 @@ int main(int argc, char* argv[])
   }
 
   rmf_planner_viz::draw::Graph graph_0_drawable(graph_0, 1.0, font);
-
+  std::vector<std::string> map_names = graph_0_drawable.get_map_names();
+  
   std::shared_ptr<rmf_traffic::schedule::Database> database =
       std::make_shared<rmf_traffic::schedule::Database>();
 
@@ -269,7 +270,21 @@ int main(int argc, char* argv[])
         if (ImGui::InputInt("Text size", &sz))
         {
           if (sz > 0)
-            graph_0_drawable.set_text_size(sz);
+            graph_0_drawable.set_text_size((uint)sz);
+        }
+        ImGui::Separator();
+        ImGui::NewLine();
+
+        if (graph_0_drawable.current_map())
+        {
+          ImGui::Text("Maps");
+
+          for (uint i=0; i<map_names.size(); ++i)
+          {
+            bool activated = map_names[i] == *graph_0_drawable.current_map();
+            if (ImGui::RadioButton(map_names[i].c_str(), activated))
+              graph_0_drawable.choose_map(map_names[i]);
+          }
         }
         ImGui::EndMenu();
       }

@@ -461,9 +461,20 @@ void Graph::draw(sf::RenderTarget& target, sf::RenderStates states) const
 
 void Graph::set_text_size(uint sz)
 {
-  auto& map_data = _pimpl->data.at(*_pimpl->current_map);
-  for (auto& s : map_data.waypoints_text)
-    s.setCharacterSize(sz);
+  for (auto& iter : _pimpl->data)
+  {
+    auto& map_data = iter.second;
+    for (auto& s : map_data.waypoints_text)
+      s.setCharacterSize(sz);
+  }
+}
+
+std::vector<std::string> Graph::get_map_names()
+{
+  std::vector<std::string> names;
+  for (auto& s : _pimpl->data)
+    names.push_back(s.first);
+  return names;
 }
 
 } // namespace draw
