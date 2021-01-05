@@ -94,7 +94,7 @@ public:
       const auto& waypoint = graph.get_waypoint(i);
       sf::Text text;
       text.setFont(font);
-      text.setCharacterSize(12);
+      text.setCharacterSize(24);
       if (waypoint.name())
       {
         std::string name = *waypoint.name();

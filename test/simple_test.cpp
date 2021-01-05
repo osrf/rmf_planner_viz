@@ -266,7 +266,7 @@ int main(int argc, char* argv[])
     {
       if (ImGui::BeginMenu("UI"))
       {
-        static int sz = 12;
+        static int sz = 24;
         if (ImGui::InputInt("Text size", &sz))
         {
           if (sz > 0)
