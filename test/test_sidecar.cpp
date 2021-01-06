@@ -102,12 +102,6 @@ void draw_robot_on_spline(fcl::MotionBase<double>* motion, double interp,
   }
 }
 
-enum PRESET_TYPE
-{
-  PRESET_LINEAR = 0,
-  PRESET_SPLINEMOTION
-};
-
 int main()
 {
   // square window to avoid stretching
@@ -137,21 +131,9 @@ int main()
   rmf_traffic::Profile profile_circle { circle_shape };
   rmf_traffic::Profile profile_circle_with_circle_offset { circle_shape };
 
-  auto to_fcl = [](const std::array<Eigen::Vector3d, 4>& knots) {
-    std::array<Eigen::Vector3d, 4> Td;
-    std::array<Eigen::Vector3d, 4> Rd;
-
-    for (std::size_t i = 0; i < 4; ++i) {
-      const Eigen::Vector3d p = knots[i];
-      Td[i] = Eigen::Vector3d(p[0], p[1], 0.0);
-      Rd[i] = Eigen::Vector3d(0.0, 0.0, p[2]);
-    }
-
-    return fcl::SplineMotion<double>(Td[0], Td[1], Td[2], Td[3], Rd[0], Rd[1], Rd[2],
-                             Rd[3]);
-  };
-
   double tolerance = 0.01;
+  std::vector<rmf_planner_viz::draw::Preset> presets;
+  presets = rmf_planner_viz::draw::setup_presets();
 
   // Test collision with unit spheres vs 
   auto shape_a = std::make_shared<fcl::Sphere<double>>(0.5);
@@ -159,63 +141,6 @@ int main()
   // auto shape_b = std::make_shared<fcl::Sphere<double>>(0.5);
   // auto shape_b2 = std::make_shared<fcl::Sphere<double>>(0.6);
   
-  fcl::Boxd shape_b(0.5, 0.5, 0.0);
-  fcl::Boxd shape_b2(0.6, 0.6, 0.0);
-  
-  fcl::Transform3d shape_a2_offset, shape_b2_offset;
-  shape_a2_offset.setIdentity();
-  shape_b2_offset.setIdentity();
-  
-  auto shape_b_bvh = std::make_shared<fcl::BVHModel<fcl::OBBRSSd>>();
-  auto box_to_triangle_vertices = [](const fcl::Boxd& box, const fcl::Transform3d& pose, std::vector<fcl::Vector3d>& vertices_out, 
-    std::vector<fcl::Triangle>& triangles_out)
-  {
-    double x_length = box.side[0];
-    double y_length = box.side[1];
-
-    vertices_out.resize(4);
-    vertices_out[0] = fcl::Vector3d(-0.5 * x_length, -0.5 * y_length, 0.0);
-    vertices_out[1] = fcl::Vector3d( 0.5 * x_length, -0.5 * y_length, 0.0);
-    vertices_out[2] = fcl::Vector3d(-0.5 * x_length,  0.5 * y_length, 0.0);
-    vertices_out[3] = fcl::Vector3d( 0.5 * x_length,  0.5 * y_length, 0.0);
-
-    triangles_out.resize(1);
-    triangles_out[0].set(0, 1, 2);
-    //triangles_out[1].set(1, 3, 2);
-
-    for(unsigned int i = 0; i < vertices_out.size(); ++i)
-      vertices_out[i] = pose * vertices_out[i];
-  };
-
-  
-  // add shape
-  {
-#if 1
-    shape_b_bvh->beginModel();
-    std::vector<fcl::Vector3d> vertices;
-    std::vector<fcl::Triangle> triangle_indices;
-    
-    fcl::Transform3d identity;
-    identity.setIdentity();
-    box_to_triangle_vertices(shape_b, identity, vertices, triangle_indices);
-    int r = shape_b_bvh->addSubModel(vertices, triangle_indices);
-    if (r != fcl::BVH_OK)
-      printf("failed#1\n");
-
-    // vertices.clear();
-    // triangle_indices.clear();
-    // box_to_triangle_vertices(shape_b2, shape_b2_offset, vertices, triangle_indices);
-    // r = shape_b_bvh->addSubModel(vertices, triangle_indices);
-    // if (r != fcl::BVH_OK)
-    //   printf("failed#2");
-    shape_b_bvh->endModel();
-#else
-    fcl::Transform3d ident;
-    ident.setIdentity();
-    int res = fcl::generateBVHModel(*shape_b_bvh, shape_b, ident, fcl::FinalizeModel::DO);
-#endif
-  }
-
   // interp motion parameters
   Eigen::Vector3d a_start(0,0,0), a_end(0,0,0);
   double a_rot_start = 0.0, a_rot_end = 0.0;
@@ -253,304 +178,34 @@ int main()
     using namespace rmf_planner_viz::draw;
 
     {
-      // ImGui::Text("knots_b[0]: %f %f %f", knots_b[0][0], knots_b[0][1], knots_b[0][2]);
-      // ImGui::Text("knots_b[1]: %f %f %f", knots_b[1][0], knots_b[1][1], knots_b[1][2]);
-      // ImGui::Text("knots_b[2]: %f %f %f", knots_b[2][0], knots_b[2][1], knots_b[2][2]);
-      // ImGui::Text("knots_b[3]: %f %f %f", knots_b[3][0], knots_b[3][1], knots_b[3][2]);
       std::shared_ptr<fcl::MotionBase<double>> motion_a, motion_b;
-      static int current_preset = 5;
-      PRESET_TYPE preset_type = PRESET_LINEAR;
-
-      ImGui::Text("Linearly interpolated");
-      if (ImGui::Button("Preset #0 (Straight Line vs Stationary)"))
-        current_preset = 0;
-      if (ImGui::Button("Preset #1 (On the spot rotation vs Stationary)"))
-        current_preset = 1;
-      if (ImGui::Button("Preset #2 (2 sidecars rotating and hitting)"))
-        current_preset = 2;
-      if (ImGui::Button("Preset #3 (2 sidecars crossing each other)"))
-        current_preset = 3;
-      ImGui::Separator();
-
-      ImGui::Text("fclSplineMotion");
-      
-      if (ImGui::Button("Preset #4 (Straight Line vs Stationary)"))
-        current_preset = 4;
-      if (ImGui::Button("Preset #5 (On the spot rotation vs Stationary)"))
-        current_preset = 5;
-      if (ImGui::Button("Preset #6 (2 sidecars rotating and hitting)"))
-        current_preset = 6;
-      if (ImGui::Button("Preset #7 (2 sidecars crossing each other #1)"))
-        current_preset = 7;
-      if (ImGui::Button("Preset #8 (2 sidecars crossing each other #2)"))
-        current_preset = 8;
-      if (ImGui::Button("Preset #9 (2 sidecars crossing each other #3)"))
-        current_preset = 9;
-      if (ImGui::Button("Preset #10 (Arc without rotation vs Stationary)"))
-        current_preset = 10;
-      if (ImGui::Button("Preset #11 (Arc with rotation vs Stationary)"))
-        current_preset = 11;
-        
-      // setup
       std::vector<ModelSpaceShape> a_shapes;
       std::vector<ModelSpaceShape> b_shapes;
-      if (current_preset == 0 || current_preset == 4)
+      PRESET_TYPE preset_type = PRESET_LINEAR;
+      static int current_preset = 0;
+
+      std::string preview_val = std::to_string(current_preset);
+      if (current_preset != -1 && current_preset < presets.size())
+        preview_val = "#" + std::to_string(current_preset) + " (" + presets[current_preset]._description + ")";
+
+      if (ImGui::BeginCombo("Preset", preview_val.c_str()))
       {
-        if (current_preset == 0)
-          preset_type = PRESET_LINEAR;
-        else
-          preset_type = PRESET_SPLINEMOTION;
-        a_shapes.emplace_back(identity, 0.5);
-        b_shapes.emplace_back(identity, 0.5);
-
-        shape_b2_offset.setIdentity();
-        shape_b2_offset.pretranslate(Eigen::Vector3d(0, -1.0, 0));
-        b_shapes.emplace_back(shape_b2_offset, 0.6);
-        
-        tolerance = 0.01;
-
-        a_start = Eigen::Vector3d(0, 0, 0);
-        a_end = Eigen::Vector3d(0, 0, 0);
-        a_rot_start = a_rot_end = 0.0;
-
-        b_start = Eigen::Vector3d(-3, 2, 0);
-        b_end = Eigen::Vector3d(0, 2, 0);
-        b_rot_start = b_rot_end = 0.0;
-
-        // for rendering
-        Eigen::Vector3d zero(0,0,0);
-        auto knots_a =
-          rmf_planner_viz::draw::compute_knots(a_start, a_end, zero, zero);
-        auto knots_b =
-          rmf_planner_viz::draw::compute_knots(b_start, b_end, zero, zero);
-
-        motion_a = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_a));
-        motion_b = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_b));
-      }
-      else if (current_preset == 1 || current_preset == 5)
-      {
-        if (current_preset == 1)
-          preset_type = PRESET_LINEAR;
-        else
-          preset_type = PRESET_SPLINEMOTION;
-        a_shapes.emplace_back(identity, 0.5);
-        b_shapes.emplace_back(identity, 0.5);
-
-        shape_b2_offset.setIdentity();
-        shape_b2_offset.pretranslate(Eigen::Vector3d(0, -1.0, 0));
-        b_shapes.emplace_back(shape_b2_offset, 0.6);
-        
-        tolerance = 0.01;
-
-        a_start = Eigen::Vector3d(0, 0, 0);
-        a_end = Eigen::Vector3d(0, 0, 0);
-        a_rot_start = a_rot_end = 0.0;
-
-        b_start = Eigen::Vector3d(-2, 0, 0);
-        b_end = Eigen::Vector3d(-2, 0, 0);
-        b_rot_start = 0;
-        b_rot_end = EIGEN_PI / 2.0;
-
-        // for rendering
-        Eigen::Vector3d zero(0,0,0);
-        auto knots_a =
-          rmf_planner_viz::draw::compute_knots(
-            Eigen::Vector3d(a_start.x(), a_start.y(), a_rot_start),
-            Eigen::Vector3d(a_end.x(), a_end.y(), a_rot_end),
-            zero, zero);
-        auto knots_b =
-          rmf_planner_viz::draw::compute_knots(
-            Eigen::Vector3d(b_start.x(), b_start.y(), b_rot_start), 
-            Eigen::Vector3d(b_end.x(), b_end.y(), b_rot_end), 
-            zero, zero);
-
-        motion_a = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_a));
-        motion_b = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_b));
-      }
-      else if (current_preset == 2 || current_preset == 6)
-      {
-        if (current_preset == 2)
-          preset_type = PRESET_LINEAR;
-        else
-          preset_type = PRESET_SPLINEMOTION;
-        a_shapes.emplace_back(identity, 0.5);
-        b_shapes.emplace_back(identity, 0.5);
-
-        shape_a2_offset.setIdentity();
-        shape_a2_offset.pretranslate(Eigen::Vector3d(0, -1.0, 0));
-        a_shapes.emplace_back(shape_a2_offset, 0.6);
-
-        shape_b2_offset.setIdentity();
-        shape_b2_offset.pretranslate(Eigen::Vector3d(0, -1.0, 0));
-        b_shapes.emplace_back(shape_b2_offset, 0.6);
-        
-        tolerance = 0.01;
-
-        a_start = Eigen::Vector3d(0, 0, 0);
-        a_end = Eigen::Vector3d(0, 0, 0);
-        a_rot_start = 0.0;
-        a_rot_end = -EIGEN_PI;
-
-        b_start = Eigen::Vector3d(-3.8, 0, 0);
-        b_end = Eigen::Vector3d(-2.5, 0, 0);
-        b_rot_start = 0;
-        b_rot_end = EIGEN_PI;
-
-        // for rendering
-        Eigen::Vector3d zero(0,0,0);
-        auto knots_a =
-          rmf_planner_viz::draw::compute_knots(
-            Eigen::Vector3d(a_start.x(), a_start.y(), a_rot_start),
-            Eigen::Vector3d(a_end.x(), a_end.y(), a_rot_end),
-            zero, zero);
-        auto knots_b =
-          rmf_planner_viz::draw::compute_knots(
-            Eigen::Vector3d(b_start.x(), b_start.y(), b_rot_start), 
-            Eigen::Vector3d(b_end.x(), b_end.y(), b_rot_end), 
-            zero, zero);
-
-        motion_a = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_a));
-        motion_b = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_b));
-      }
-      else if (current_preset == 3 || current_preset == 7)
-      {
-        if (current_preset == 3)
-          preset_type = PRESET_LINEAR;
-        else
-          preset_type = PRESET_SPLINEMOTION;
-        a_shapes.emplace_back(identity, 0.5);
-        b_shapes.emplace_back(identity, 0.5);
-
-        shape_a2_offset.setIdentity();
-        shape_a2_offset.pretranslate(Eigen::Vector3d(0, -1.0, 0));
-        a_shapes.emplace_back(shape_a2_offset, 0.6);
-
-        shape_b2_offset.setIdentity();
-        shape_b2_offset.pretranslate(Eigen::Vector3d(0, -1.0, 0));
-        b_shapes.emplace_back(shape_b2_offset, 0.6);
-
-        tolerance = 0.01;
-        
-        a_start = Eigen::Vector3d(2, 3.0, 0);
-        a_end = Eigen::Vector3d(2, -3.0, 0);
-        a_rot_start = a_rot_end = 0.0;
-
-        b_start = Eigen::Vector3d(-3, 0, 0);
-        b_end = Eigen::Vector3d(3, 0, 0);
-        b_rot_start = b_rot_end = 0.0;
-
-        // for rendering
-        Eigen::Vector3d zero(0,0,0);
-        auto knots_a =
-          rmf_planner_viz::draw::compute_knots(a_start, a_end, zero, zero);
-        auto knots_b =
-          rmf_planner_viz::draw::compute_knots(b_start, b_end, zero, zero);
-
-        motion_a = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_a));
-        motion_b = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_b));
-      }
-      else if (current_preset == 8)
-      {
-        preset_type = PRESET_SPLINEMOTION;
-        a_shapes.emplace_back(identity, 0.5);
-        b_shapes.emplace_back(identity, 0.5);
-
-        shape_a2_offset.setIdentity();
-        shape_a2_offset.pretranslate(Eigen::Vector3d(0, -1.0, 0));
-        a_shapes.emplace_back(shape_a2_offset, 0.6);
-
-        shape_b2_offset.setIdentity();
-        shape_b2_offset.pretranslate(Eigen::Vector3d(0, -1.0, 0));
-        b_shapes.emplace_back(shape_b2_offset, 0.6);
-        
-        tolerance = 0.01;
-        
-        Eigen::Vector3d zero(0,0,0);
-        auto knots_a =
-          rmf_planner_viz::draw::compute_knots(Eigen::Vector3d(0, -3, 0), Eigen::Vector3d(0, 3, 0),
-                        Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 0, 0));
-        auto knots_b =
-          rmf_planner_viz::draw::compute_knots(Eigen::Vector3d(-3, 0, 0), Eigen::Vector3d(3, 0, 0),
-                        Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 0, 0));
-
-        motion_a = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_a));
-        motion_b = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_b));
-      }
-      else if (current_preset == 9)
-      {
-        preset_type = PRESET_SPLINEMOTION;
-        a_shapes.emplace_back(identity, 0.5);
-        b_shapes.emplace_back(identity, 0.5);
-
-        shape_a2_offset.setIdentity();
-        shape_a2_offset.pretranslate(Eigen::Vector3d(0, -1.0, 0));
-        a_shapes.emplace_back(shape_a2_offset, 0.6);
-
-        shape_b2_offset.setIdentity();
-        shape_b2_offset.pretranslate(Eigen::Vector3d(0, -1.0, 0));
-        b_shapes.emplace_back(shape_b2_offset, 0.6);
-        
-        tolerance = 0.1;
-
-        Eigen::Vector3d zero(0,0,0);
-        auto knots_a =
-          rmf_planner_viz::draw::compute_knots(Eigen::Vector3d(-1, -3, 0), Eigen::Vector3d(-1, 3, 0),
-                        Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 0, 0));
-        auto knots_b =
-          rmf_planner_viz::draw::compute_knots(Eigen::Vector3d(-3, 0, 0), Eigen::Vector3d(3, 0, 0),
-                        Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 0, 0));
-
-        motion_a = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_a));
-        motion_b = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_b));
-      }
-      // fcl splines with arcs
-      else if (current_preset == 10)
-      {
-        preset_type = PRESET_SPLINEMOTION;
-        a_shapes.emplace_back(identity, 0.5);
-        b_shapes.emplace_back(identity, 0.5);
-        
-        shape_b2_offset.setIdentity();
-        shape_b2_offset.pretranslate(Eigen::Vector3d(1, 0.0, 0));
-        b_shapes.emplace_back(shape_b2_offset, 0.6);
-
-        tolerance = 0.1;
-
-        auto knots_a =
-          rmf_planner_viz::draw::compute_knots(Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 0, 0),
-                        Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 0, 0));
-
-        auto knots_b =
-          rmf_planner_viz::draw::compute_knots(Eigen::Vector3d(-5, 0, 0), Eigen::Vector3d(-2, 0, 0),
-                        Eigen::Vector3d(0, 16, 0), Eigen::Vector3d(0, -16, 0));
-
-        motion_a = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_a));
-        motion_b = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_b)); 
-      }
-      else if (current_preset == 11)
-      {
-        preset_type = PRESET_SPLINEMOTION;
-        a_shapes.emplace_back(identity, 0.5);
-        b_shapes.emplace_back(identity, 0.5);
-
-        shape_b2_offset.setIdentity();
-        shape_b2_offset.pretranslate(Eigen::Vector3d(0, -1.0, 0));
-        b_shapes.emplace_back(shape_b2_offset, 0.6);
-
-        tolerance = 0.01;
-
-        auto knots_a =
-          rmf_planner_viz::draw::compute_knots(Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 0, 0),
-                        Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 0, 0));
-
-        auto knots_b =
-            rmf_planner_viz::draw::compute_knots(Eigen::Vector3d(-5, 0, 0), Eigen::Vector3d(-1.5, 0, EIGEN_PI / 2.0),
-                          Eigen::Vector3d(0, 16, 0), Eigen::Vector3d(0, -16, 0));
-
-        motion_a = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_a));
-        motion_b = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_b)); 
+        for (int i=0; i<(int)presets.size(); ++i)
+        {
+          std::string btn_text = "#" + std::to_string(i) + " (" + presets[i]._description + ")";
+          if (ImGui::Selectable(btn_text.c_str(), current_preset == i))
+            current_preset = i;
+        }
+        ImGui::EndCombo();
       }
 
+      if (current_preset != -1 && current_preset < presets.size())
+      {
+        const auto& preset = presets[current_preset];
+        preset._callback(preset, a_shapes, b_shapes, tolerance, motion_a, motion_b);
+        preset_type = preset._type;
+      }
+    
       ImGui::Separator();
       ImGui::Text("Preset: %d", current_preset);
       ImGui::Separator();
@@ -571,28 +226,7 @@ int main()
       sf::Color toi_red_color(178, 34, 34);
 
       // collision
-      if (preset_type == PRESET_LINEAR)
-      {
-        double toi = 0.0;
-        bool collide = collide_seperable_circles(
-          a_start, a_end, a_rot_start, a_rot_end,
-          b_start, b_end, b_rot_start, b_rot_end,
-          a_shapes, b_shapes,
-          toi, (double)tolerance);
-        if (collide)
-        {
-          ImGui::Text("Collide! TOI: %f", toi);
-          if (draw_toi_shapes)
-          {
-            draw_robot_on_spline(motion_a.get(), toi, a_shapes, toi_red_color);
-            draw_robot_on_spline(motion_b.get(), toi, b_shapes, toi_green_color);
-          }
-        }
-        else
-          ImGui::Text("No collision");
-
-      }
-      else if (preset_type == PRESET_SPLINEMOTION)
+      if (preset_type == PRESET_SPLINEMOTION)
       {
 #ifdef PROFILING_USE_RDTSC
         int v = 0;
@@ -637,24 +271,6 @@ int main()
         ImGui::Text("Time taken (ms): %.10g", val);
 #endif
         ImGui::Text("Distance checks: %d", dist_checks);
-      }
-      else
-      {
-        const auto obj_a = fcl::ContinuousCollisionObject<double>(shape_a, motion_a);
-        const auto obj_b = fcl::ContinuousCollisionObject<double>(shape_b_bvh, motion_b);
-        
-        fcl::ContinuousCollisionRequest<double> request;
-        request.ccd_solver_type = fcl::CCDC_CONSERVATIVE_ADVANCEMENT;
-        request.gjk_solver_type = fcl::GST_LIBCCD;
-
-        // test for collision
-        fcl::ContinuousCollisionResultd result;
-        fcl::collide(&obj_a, &obj_b, request, result);
-
-        if (result.is_collide)
-          ImGui::Text("Collide! TOI: %f", result.time_of_contact);
-        else
-          ImGui::Text("No collision");
       }
 
       // reset the motions

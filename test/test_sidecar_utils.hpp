@@ -40,14 +40,6 @@ struct ModelSpaceShape
   double _radius;
 };
 
-// this uses straight-line linear interpolation motions
-bool collide_seperable_circles(
-  Eigen::Vector3d a_start, Eigen::Vector3d a_end, double a_rot_start, double a_rot_end,
-  Eigen::Vector3d b_start, Eigen::Vector3d b_end, double b_rot_start, double b_rot_end,
-  const std::vector<ModelSpaceShape>& a_shapes,
-  const std::vector<ModelSpaceShape>& b_shapes,
-  double& impact_time, double tolerance = 0.001);
-
 // this uses spline motions
 bool collide_seperable_circles(
   fcl::SplineMotion<double>& motion_a, 
@@ -57,6 +49,30 @@ bool collide_seperable_circles(
   double& impact_time, uint& dist_checks, 
   uint safety_maximum_checks = 120, double tolerance = 0.001);
 
+// Presets
+enum PRESET_TYPE
+{
+  PRESET_LINEAR = 0,
+  PRESET_SPLINEMOTION
+};
+
+struct Preset
+{
+  std::string _description;
+  PRESET_TYPE _type = PRESET_SPLINEMOTION;
+  double tolerance = 0.01;
+
+  using PresetSetupFunc = void (*)(
+    const Preset& preset,
+    std::vector<ModelSpaceShape>& a_shapes, 
+    std::vector<ModelSpaceShape>& b_shapes, 
+    double& tolerance,
+    std::shared_ptr<fcl::MotionBase<double>>& motion_a,
+    std::shared_ptr<fcl::MotionBase<double>>& motion_b);
+  PresetSetupFunc _callback = nullptr;
+};
+
+std::vector<Preset> setup_presets();
 
 } // namespace draw
 } // namespace rmf_planner_viz
