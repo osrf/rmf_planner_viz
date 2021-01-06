@@ -37,7 +37,7 @@
 #include <fcl/geometry/geometric_shape_to_BVH_model.h>
 
 #include "imgui-SFML.h"
-#include "custom_collision_algo.hpp"
+#include "test_sidecar_utils.hpp"
 #include "spline_offset_utils.hpp"
 
 //#define PROFILING_USE_RDTSC 1

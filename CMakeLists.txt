@@ -113,7 +113,7 @@ if(fcl_FOUND)
   add_executable(test_sidecar
     test/test_sidecar.cpp
     test/spline_offset_utils.cpp
-    test/custom_collision_algo.cpp
+    test/test_sidecar_utils.cpp
   )
 
   target_link_libraries(test_sidecar
