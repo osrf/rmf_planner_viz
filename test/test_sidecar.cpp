@@ -105,8 +105,7 @@ void draw_robot_on_spline(fcl::MotionBase<double>* motion, double interp,
 enum PRESET_TYPE
 {
   PRESET_LINEAR = 0,
-  PRESET_SPLINEMOTION,
-  PRESET_OTHER
+  PRESET_SPLINEMOTION
 };
 
 int main()
@@ -114,7 +113,7 @@ int main()
   // square window to avoid stretching
   sf::RenderWindow app_window(
         sf::VideoMode(1024, 1024),
-        "Test_FCL_SplineOffset",
+        "Test_Sidecar",
         sf::Style::Default);
   app_window.setFramerateLimit(60);
   app_window.resetGLStates();
@@ -291,10 +290,7 @@ int main()
         current_preset = 10;
       if (ImGui::Button("Preset #11 (Arc with rotation vs Stationary)"))
         current_preset = 11;
-      
-      if (ImGui::Button("Preset #99 (trianglemesh (not working))"))
-        current_preset = 99;
-
+        
       // setup
       std::vector<ModelSpaceShape> a_shapes;
       std::vector<ModelSpaceShape> b_shapes;
@@ -554,24 +550,7 @@ int main()
         motion_a = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_a));
         motion_b = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_b)); 
       }
-      else if (current_preset == 99)
-      {
-        preset_type = PRESET_OTHER;
-        shape_b2_offset.setIdentity();
-        shape_b2_offset.pretranslate(Eigen::Vector3d(0, -1.0, 0));
 
-        fcl::Transform3<double> b_start;
-        b_start.setIdentity();
-        b_start.translation() = fcl::Vector3d(-2, 0, 0);
-
-        fcl::Transform3<double> b_end;
-        b_end.setIdentity();
-        b_end.translation() = fcl::Vector3d(0, 0, 0);
-
-        motion_a = std::make_shared<fcl::InterpMotion<double>>(identity, identity);
-        motion_b = std::make_shared<fcl::InterpMotion<double>>(b_start, b_end);
-      }
-      
       ImGui::Separator();
       ImGui::Text("Preset: %d", current_preset);
       ImGui::Separator();
