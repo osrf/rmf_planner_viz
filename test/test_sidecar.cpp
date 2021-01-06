@@ -148,13 +148,22 @@ int main()
   Eigen::Vector3d b_start(0,0,0), b_end(0,0,0);
   double b_rot_start = 0.0, b_rot_end = 0.0;
 
+  Eigen::Vector3d b_start_pos(0,0,0);
+  Eigen::Vector3d b_end_pos(0,0,0);
+
   fcl::Transform3<double> identity;
   identity.setIdentity();
+  bool b_drag = false;
+  bool b_start_override = false;
+  bool b_end_override = false;
+  bool preset_changed = true;
 
   sf::Clock deltaClock;
   while (app_window.isOpen())
   {
     sf::Event event;
+    
+
     while (app_window.pollEvent(event))
     {
       ImGui::SFML::ProcessEvent(event);
@@ -167,6 +176,27 @@ int main()
         sf::FloatRect visibleArea(0, 0, event.size.width, event.size.height);
         app_window.setView(sf::View(visibleArea));
       }
+
+      auto& io = ImGui::GetIO();
+      if (!io.WantCaptureMouse)
+      {
+        if (event.type == sf::Event::MouseButtonPressed)
+        {
+          sf::Vector2f px = app_window.mapPixelToCoords(sf::Vector2i(event.mouseButton.x, event.mouseButton.y));
+          if (event.mouseButton.button == sf::Mouse::Button::Left)
+          {
+            b_start_override = true;
+            b_start_pos = Eigen::Vector3d((double)px.x, (double)px.y * -1.f, 0.0);
+            preset_changed = true;
+          }
+          if (event.mouseButton.button == sf::Mouse::Button::Right)
+          {
+            b_end_override = true;
+            b_end_pos = Eigen::Vector3d((double)px.x, (double)px.y * -1.f, 0.0);
+            preset_changed = true;
+          }
+        }
+      }
     }
 
     ImGui::SFML::Update(app_window, deltaClock.restart());
@@ -178,10 +208,10 @@ int main()
     using namespace rmf_planner_viz::draw;
 
     {
-      std::shared_ptr<fcl::MotionBase<double>> motion_a, motion_b;
-      std::vector<ModelSpaceShape> a_shapes;
-      std::vector<ModelSpaceShape> b_shapes;
-      PRESET_TYPE preset_type = PRESET_LINEAR;
+      static std::shared_ptr<fcl::MotionBase<double>> motion_a, motion_b;
+      static std::vector<ModelSpaceShape> a_shapes;
+      static std::vector<ModelSpaceShape> b_shapes;
+      PRESET_TYPE preset_type = PRESET_SPLINEMOTION;
       static int current_preset = 0;
 
       std::string preview_val = std::to_string(current_preset);
@@ -194,16 +224,28 @@ int main()
         {
           std::string btn_text = "#" + std::to_string(i) + " (" + presets[i]._description + ")";
           if (ImGui::Selectable(btn_text.c_str(), current_preset == i))
+          {
             current_preset = i;
+            preset_changed = true;
+            b_start_override = false;
+            b_end_override = false;
+          }
         }
         ImGui::EndCombo();
       }
 
-      if (current_preset != -1 && current_preset < presets.size())
+      if (preset_changed)
       {
-        const auto& preset = presets[current_preset];
-        preset._callback(preset, a_shapes, b_shapes, tolerance, motion_a, motion_b);
-        preset_type = preset._type;
+        a_shapes.clear();
+        b_shapes.clear();
+        if (current_preset != -1 && current_preset < presets.size())
+        {
+          const auto& preset = presets[current_preset];
+          preset._callback(b_start_override, b_start_pos, b_end_override, b_end_pos,
+            a_shapes, b_shapes, tolerance, motion_a, motion_b);
+          preset_type = preset._type;
+        }
+        preset_changed = false;
       }
     
       ImGui::Separator();
@@ -276,6 +318,14 @@ int main()
       // reset the motions
       motion_a->integrate(0.0);
       motion_b->integrate(0.0);
+
+      // draw handle
+      {
+        fcl::Transform3d tf;
+        motion_b->getCurrentTransform(tf);
+        auto translate = tf.translation();
+        IMDraw::draw_circle(sf::Vector2f(translate.x(), translate.y()), 0.1);
+      }
       
       ImGui::Separator();
 

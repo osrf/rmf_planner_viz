@@ -63,7 +63,10 @@ struct Preset
   double tolerance = 0.01;
 
   using PresetSetupFunc = void (*)(
-    const Preset& preset,
+    bool override_b_start_pos,
+    Eigen::Vector3d b_start_o,
+    bool override_b_end_pos,
+    Eigen::Vector3d b_end_o,
     std::vector<ModelSpaceShape>& a_shapes, 
     std::vector<ModelSpaceShape>& b_shapes, 
     double& tolerance,

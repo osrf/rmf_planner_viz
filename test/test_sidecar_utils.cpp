@@ -262,7 +262,11 @@ std::vector<Preset> setup_presets()
     Preset p;
     p._description = "Straight Line vs Stationary";
     p._type = PRESET_SPLINEMOTION;
-    p._callback = [](const Preset& preset,
+    p._callback = [](
+      bool override_b_start_pos,
+      Eigen::Vector3d b_start_o,
+      bool override_b_end_pos,
+      Eigen::Vector3d b_end_o,
       std::vector<ModelSpaceShape>& a_shapes, 
       std::vector<ModelSpaceShape>& b_shapes, 
       double& tolerance,
@@ -283,10 +287,15 @@ std::vector<Preset> setup_presets()
       tolerance = 0.01;
 
       Eigen::Vector3d zero(0,0,0);
+      Eigen::Vector3d b_start(-3, 2, 0), b_end(0, 2, 0);
+      if (override_b_start_pos)
+        b_start = b_start_o;
+      if (override_b_end_pos)
+        b_end = b_end_o;
       auto knots_a =
         rmf_planner_viz::draw::compute_knots(Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 0, 0), zero, zero);
       auto knots_b =
-        rmf_planner_viz::draw::compute_knots(Eigen::Vector3d(-3, 2, 0), Eigen::Vector3d(0, 2, 0), zero, zero);
+        rmf_planner_viz::draw::compute_knots(b_start, b_end, zero, zero);
 
       motion_a = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_a));
       motion_b = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_b));
@@ -299,7 +308,11 @@ std::vector<Preset> setup_presets()
     Preset p;
     p._description = "On the spot rotation vs Stationary";
     p._type = PRESET_SPLINEMOTION;
-    p._callback = [](const Preset& preset,
+    p._callback = [](
+      bool override_b_start_pos,
+      Eigen::Vector3d b_start_o,
+      bool override_b_end_pos,
+      Eigen::Vector3d b_end_o,
       std::vector<ModelSpaceShape>& a_shapes, 
       std::vector<ModelSpaceShape>& b_shapes, 
       double& tolerance,
@@ -320,10 +333,17 @@ std::vector<Preset> setup_presets()
       tolerance = 0.01;
       
       Eigen::Vector3d zero(0,0,0);
+      Eigen::Vector3d b_start(-2, 0, 0), b_end(-2, 0, 0);
+      if (override_b_start_pos)
+        b_start = b_start_o;
+      if (override_b_end_pos)
+        b_end = b_end_o;
+      b_end.z() = EIGEN_PI / 2.0;
+
       auto knots_a =
         rmf_planner_viz::draw::compute_knots(Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 0, 0), zero, zero);
       auto knots_b =
-        rmf_planner_viz::draw::compute_knots(Eigen::Vector3d(-2, 0, 0), Eigen::Vector3d(-2, 0, EIGEN_PI / 2.0), zero, zero);
+        rmf_planner_viz::draw::compute_knots(b_start, b_end, zero, zero);
 
       motion_a = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_a));
       motion_b = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_b));
@@ -336,7 +356,11 @@ std::vector<Preset> setup_presets()
     Preset p;
     p._description = "2 sidecars rotating and hitting";
     p._type = PRESET_SPLINEMOTION;
-    p._callback = [](const Preset& preset,
+    p._callback = [](
+      bool override_b_start_pos,
+      Eigen::Vector3d b_start_o,
+      bool override_b_end_pos,
+      Eigen::Vector3d b_end_o,
       std::vector<ModelSpaceShape>& a_shapes, 
       std::vector<ModelSpaceShape>& b_shapes, 
       double& tolerance,
@@ -360,12 +384,19 @@ std::vector<Preset> setup_presets()
       b_shapes.emplace_back(shape_b2_offset, 0.6);
       
       tolerance = 0.01;
+
+      Eigen::Vector3d b_start(-3.8, 0, 0), b_end(-2.5, 0, 0);
+      if (override_b_start_pos)
+        b_start = b_start_o;
+      if (override_b_end_pos)
+        b_end = b_end_o;
+      b_end.z() = EIGEN_PI;
       
       Eigen::Vector3d zero(0,0,0);
       auto knots_a =
         rmf_planner_viz::draw::compute_knots(Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 0, -EIGEN_PI), zero, zero);
       auto knots_b =
-        rmf_planner_viz::draw::compute_knots(Eigen::Vector3d(-3.8, 0, 0), Eigen::Vector3d(-2.5, 0, EIGEN_PI), zero, zero);
+        rmf_planner_viz::draw::compute_knots(b_start, b_end, zero, zero);
 
       motion_a = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_a));
       motion_b = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_b));
@@ -378,7 +409,11 @@ std::vector<Preset> setup_presets()
     Preset p;
     p._description = "2 sidecars crossing each other #1";
     p._type = PRESET_SPLINEMOTION;
-    p._callback = [](const Preset& preset,
+    p._callback = [](
+      bool override_b_start_pos,
+      Eigen::Vector3d b_start_o,
+      bool override_b_end_pos,
+      Eigen::Vector3d b_end_o,
       std::vector<ModelSpaceShape>& a_shapes, 
       std::vector<ModelSpaceShape>& b_shapes, 
       double& tolerance,
@@ -404,10 +439,16 @@ std::vector<Preset> setup_presets()
       tolerance = 0.01;
       
       Eigen::Vector3d zero(0,0,0);
+      Eigen::Vector3d b_start(-3, 0, 0), b_end(3, 0, 0);
+      if (override_b_start_pos)
+        b_start = b_start_o;
+      if (override_b_end_pos)
+        b_end = b_end_o;
+
       auto knots_a =
         rmf_planner_viz::draw::compute_knots(Eigen::Vector3d(0, -3, 0), Eigen::Vector3d(0, 3, 0), zero, zero);
       auto knots_b =
-        rmf_planner_viz::draw::compute_knots(Eigen::Vector3d(-3, 0, 0), Eigen::Vector3d(3, 0, 0), zero, zero);
+        rmf_planner_viz::draw::compute_knots(b_start, b_end, zero, zero);
 
       motion_a = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_a));
       motion_b = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_b));
@@ -420,7 +461,11 @@ std::vector<Preset> setup_presets()
     Preset p;
     p._description = "2 sidecars crossing each other #2";
     p._type = PRESET_SPLINEMOTION;
-    p._callback = [](const Preset& preset,
+    p._callback = [](
+      bool override_b_start_pos,
+      Eigen::Vector3d b_start_o,
+      bool override_b_end_pos,
+      Eigen::Vector3d b_end_o,
       std::vector<ModelSpaceShape>& a_shapes, 
       std::vector<ModelSpaceShape>& b_shapes, 
       double& tolerance,
@@ -446,10 +491,16 @@ std::vector<Preset> setup_presets()
       tolerance = 0.1;
       
       Eigen::Vector3d zero(0,0,0);
+      Eigen::Vector3d b_start(-3, 0, 0), b_end(3, 0, 0);
+      if (override_b_start_pos)
+        b_start = b_start_o;
+      if (override_b_end_pos)
+        b_end = b_end_o;
+
       auto knots_a =
         rmf_planner_viz::draw::compute_knots(Eigen::Vector3d(-1, -3, 0), Eigen::Vector3d(-1, 3, 0), zero, zero);
       auto knots_b =
-        rmf_planner_viz::draw::compute_knots(Eigen::Vector3d(-3, 0, 0), Eigen::Vector3d(3, 0, 0), zero, zero);
+        rmf_planner_viz::draw::compute_knots(b_start, b_end, zero, zero);
 
       motion_a = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_a));
       motion_b = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_b));
@@ -462,7 +513,11 @@ std::vector<Preset> setup_presets()
     Preset p;
     p._description = "2 sidecars crossing each other #3";
     p._type = PRESET_SPLINEMOTION;
-    p._callback = [](const Preset& preset,
+    p._callback = [](
+      bool override_b_start_pos,
+      Eigen::Vector3d b_start_o,
+      bool override_b_end_pos,
+      Eigen::Vector3d b_end_o,
       std::vector<ModelSpaceShape>& a_shapes, 
       std::vector<ModelSpaceShape>& b_shapes, 
       double& tolerance,
@@ -488,10 +543,16 @@ std::vector<Preset> setup_presets()
       tolerance = 0.1;
       
       Eigen::Vector3d zero(0,0,0);
+      Eigen::Vector3d b_start(-3, 0, 0), b_end(3, 0, 0);
+      if (override_b_start_pos)
+        b_start = b_start_o;
+      if (override_b_end_pos)
+        b_end = b_end_o;
+
       auto knots_a =
         rmf_planner_viz::draw::compute_knots(Eigen::Vector3d(2, 3, 0), Eigen::Vector3d(2, -3, 0), zero, zero);
       auto knots_b =
-        rmf_planner_viz::draw::compute_knots(Eigen::Vector3d(-3, 0, 0), Eigen::Vector3d(3, 0, 0), zero, zero);
+        rmf_planner_viz::draw::compute_knots(b_start, b_end, zero, zero);
 
       motion_a = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_a));
       motion_b = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_b));
@@ -505,7 +566,11 @@ std::vector<Preset> setup_presets()
     Preset p;
     p._description = "Arc without rotation vs Stationary";
     p._type = PRESET_SPLINEMOTION;
-    p._callback = [](const Preset& preset,
+    p._callback = [](
+      bool override_b_start_pos,
+      Eigen::Vector3d b_start_o,
+      bool override_b_end_pos,
+      Eigen::Vector3d b_end_o,
       std::vector<ModelSpaceShape>& a_shapes, 
       std::vector<ModelSpaceShape>& b_shapes, 
       double& tolerance,
@@ -526,11 +591,17 @@ std::vector<Preset> setup_presets()
       tolerance = 0.1;
       
       Eigen::Vector3d zero(0,0,0);
+      Eigen::Vector3d b_start(-5, 0, 0), b_end(-2, 0, 0);
+      if (override_b_start_pos)
+        b_start = b_start_o;
+      if (override_b_end_pos)
+        b_end = b_end_o;
+
       auto knots_a =
         rmf_planner_viz::draw::compute_knots(Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 0, 0), zero, zero);
       auto knots_b =
         rmf_planner_viz::draw::compute_knots(
-          Eigen::Vector3d(-5, 0, 0), Eigen::Vector3d(-2, 0, 0), 
+          b_start, b_end,
           Eigen::Vector3d(0, 16, 0), Eigen::Vector3d(0, -16, 0));
 
       motion_a = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_a));
@@ -544,7 +615,11 @@ std::vector<Preset> setup_presets()
     Preset p;
     p._description = "Arc with rotation vs Stationary";
     p._type = PRESET_SPLINEMOTION;
-    p._callback = [](const Preset& preset,
+    p._callback = [](
+      bool override_b_start_pos,
+      Eigen::Vector3d b_start_o,
+      bool override_b_end_pos,
+      Eigen::Vector3d b_end_o,
       std::vector<ModelSpaceShape>& a_shapes, 
       std::vector<ModelSpaceShape>& b_shapes, 
       double& tolerance,
@@ -565,11 +640,18 @@ std::vector<Preset> setup_presets()
       tolerance = 0.1;
       
       Eigen::Vector3d zero(0,0,0);
+      Eigen::Vector3d b_start(-5, 0, 0), b_end(-1.5, 0, 0);
+      if (override_b_start_pos)
+        b_start = b_start_o;
+      if (override_b_end_pos)
+        b_end = b_end_o;
+      b_end.z() = EIGEN_PI / 2.0;
+
       auto knots_a =
         rmf_planner_viz::draw::compute_knots(Eigen::Vector3d(0, 0, 0), Eigen::Vector3d(0, 0, 0), zero, zero);
       auto knots_b =
         rmf_planner_viz::draw::compute_knots(
-          Eigen::Vector3d(-5, 0, 0), Eigen::Vector3d(-1.5, 0, EIGEN_PI / 2.0), 
+          b_start, b_end,
           Eigen::Vector3d(0, 16, 0), Eigen::Vector3d(0, -16, 0));
 
       motion_a = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_a));
