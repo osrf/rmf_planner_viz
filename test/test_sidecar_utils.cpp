@@ -195,7 +195,6 @@ bool collide_seperable_circles(
   uint iter = 0;
   while (dist_along_d_to_cover > tolerance && t < 1.0)
   {
-
     Eigen::Vector3d d_normalized = d.normalized();
 #ifdef DO_LOGGING
     printf("======= iter:%d\n", iter);
@@ -225,6 +224,9 @@ bool collide_seperable_circles(
       break;
   }
   
+  if (dist_checks > safety_maximum_checks)
+    return false;
+
   if (t >= 0.0 && t < 1.0)
   {
     impact_time = t;
