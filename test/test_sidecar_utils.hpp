@@ -49,6 +49,8 @@ bool collide_seperable_circles(
   double& impact_time, uint& dist_checks, 
   uint safety_maximum_checks = 120, double tolerance = 0.001);
 
+fcl::SplineMotion<double> to_fcl(const std::array<Eigen::Vector3d, 4>& knots);
+
 // Presets
 enum PRESET_TYPE
 {
@@ -61,18 +63,15 @@ struct Preset
   std::string _description;
   PRESET_TYPE _type = PRESET_SPLINEMOTION;
   double tolerance = 0.01;
+  std::vector<ModelSpaceShape> a_shapes;
+  std::vector<ModelSpaceShape> b_shapes;
 
-  using PresetSetupFunc = void (*)(
-    bool override_b_start_pos,
-    Eigen::Vector3d b_start_o,
-    bool override_b_end_pos,
-    Eigen::Vector3d b_end_o,
-    std::vector<ModelSpaceShape>& a_shapes, 
-    std::vector<ModelSpaceShape>& b_shapes, 
-    double& tolerance,
-    std::shared_ptr<fcl::MotionBase<double>>& motion_a,
-    std::shared_ptr<fcl::MotionBase<double>>& motion_b);
-  PresetSetupFunc _callback = nullptr;
+  Eigen::Vector3d a_start = Eigen::Vector3d(0,0,0);
+  Eigen::Vector3d a_end = Eigen::Vector3d(0,0,0);
+  Eigen::Vector3d b_start = Eigen::Vector3d(0,0,0);
+  Eigen::Vector3d b_end = Eigen::Vector3d(0,0,0);
+  
+  Eigen::Vector3d b_vel = Eigen::Vector3d(0,0,0);
 };
 
 std::vector<Preset> setup_presets();

@@ -143,17 +143,14 @@ int main()
   
   // interp motion parameters
   Eigen::Vector3d a_start(0,0,0), a_end(0,0,0);
-  double a_rot_start = 0.0, a_rot_end = 0.0;
 
   Eigen::Vector3d b_start(0,0,0), b_end(0,0,0);
-  double b_rot_start = 0.0, b_rot_end = 0.0;
 
   Eigen::Vector3d b_start_pos(0,0,0);
   Eigen::Vector3d b_end_pos(0,0,0);
 
   fcl::Transform3<double> identity;
   identity.setIdentity();
-  bool b_drag = false;
   bool b_start_override = false;
   bool b_end_override = false;
   bool preset_changed = true;
@@ -203,6 +200,7 @@ int main()
     
     ImGui::SetWindowSize(ImVec2(800, 200));
     ImGui::Begin("Sidecar control", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+    ImGui::Text("Use LMB/RMB to adjust start/end positions");
     
     using namespace std::chrono_literals;
     using namespace rmf_planner_viz::draw;
@@ -215,7 +213,7 @@ int main()
       static int current_preset = 0;
 
       std::string preview_val = std::to_string(current_preset);
-      if (current_preset != -1 && current_preset < presets.size())
+      if (current_preset != -1 && current_preset < (int)presets.size())
         preview_val = "#" + std::to_string(current_preset) + " (" + presets[current_preset]._description + ")";
 
       if (ImGui::BeginCombo("Preset", preview_val.c_str()))
@@ -236,13 +234,45 @@ int main()
 
       if (preset_changed)
       {
-        a_shapes.clear();
-        b_shapes.clear();
-        if (current_preset != -1 && current_preset < presets.size())
+        if (current_preset != -1 && current_preset < (int)presets.size())
         {
           const auto& preset = presets[current_preset];
-          preset._callback(b_start_override, b_start_pos, b_end_override, b_end_pos,
-            a_shapes, b_shapes, tolerance, motion_a, motion_b);
+
+          a_shapes.clear();
+          b_shapes.clear();
+          a_shapes = preset.a_shapes;
+          b_shapes = preset.b_shapes;
+
+          Eigen::Vector3d a_start = preset.a_start;
+          Eigen::Vector3d a_end = preset.a_end;
+
+          Eigen::Vector3d b_start = preset.b_start;
+          Eigen::Vector3d b_end = preset.b_end;
+
+          if (b_start_override)
+          {
+            b_start.x() = b_start_pos.x();
+            b_start.y() = b_start_pos.y();
+          }
+          if (b_end_override)
+          {
+            b_end.x() = b_end_pos.x();
+            b_end.y() = b_end_pos.y();
+          }
+
+          Eigen::Vector3d b_vel = preset.b_vel;
+          Eigen::Vector3d zero(0,0,0);
+
+          tolerance = preset.tolerance;
+
+          auto knots_a =
+            rmf_planner_viz::draw::compute_knots(a_start, a_end, zero, zero);
+          auto knots_b =
+            rmf_planner_viz::draw::compute_knots(b_start, b_end, b_vel, -b_vel);
+
+          motion_a = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_a));
+          motion_b = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_b));
+
           preset_type = preset._type;
         }
         preset_changed = false;
@@ -319,14 +349,6 @@ int main()
       motion_a->integrate(0.0);
       motion_b->integrate(0.0);
 
-      // draw handle
-      {
-        fcl::Transform3d tf;
-        motion_b->getCurrentTransform(tf);
-        auto translate = tf.translation();
-        IMDraw::draw_circle(sf::Vector2f(translate.x(), translate.y()), 0.1);
-      }
-      
       ImGui::Separator();
 
       // draw robot circle on motion
