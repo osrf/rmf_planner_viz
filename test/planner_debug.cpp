@@ -322,36 +322,6 @@ void do_planner_debug(
     ImGui::Text("Parent count: %d", parent_count);
     parent_waypoint_str += "]";
     ImGui::Text("%s", parent_waypoint_str.c_str());
-    
-#if 0
-    auto add_trajectory_to_render = [trajectory_start_time, &profile](
-      std::vector<rmf_planner_viz::draw::Trajectory>& to_render,
-      rmf_traffic::agv::Planner::Debug::ConstNodePtr node)
-    {
-      if (node->route_from_parent.empty())
-        return;
-      const rmf_traffic::Route& route = node->route_from_parent[0];
-      const auto& traj = route.trajectory();
-      auto trajectory = rmf_planner_viz::draw::Trajectory(traj,
-        profile, trajectory_start_time, std::nullopt, sf::Color::Green, { 0.0, 0.0 }, 0.5f);
-      to_render.push_back(trajectory);
-    };
-
-    if (render_inspected_node_trajectories)
-    {
-      add_trajectory_to_render(trajectories_to_render, selected_node);
-
-      if (render_parent_trajectories)
-      {
-        parent_node = selected_node->parent;
-        while (parent_node)
-        {
-          add_trajectory_to_render(trajectories_to_render, parent_node);
-          parent_node = parent_node->parent;
-        }
-      }
-    }
-#endif
   }
 
   ImGui::End();
