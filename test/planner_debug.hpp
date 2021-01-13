@@ -47,7 +47,8 @@ S& get_priority_queue_container(std::priority_queue<T, S, C>& queue)
 }
 
 void do_planner_debug(
-  const rmf_traffic::Profile& profile, 
+  const rmf_traffic::Profile& profile,
+  const std::string& chosen_map,
   rmf_traffic::agv::Planner& planner,
   std::vector<rmf_traffic::agv::Planner::Start>& starts,
   rmf_traffic::agv::Planner::Goal& goal,

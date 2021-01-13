@@ -30,6 +30,8 @@
 namespace rmf_planner_viz {
 namespace draw {
 
+static const sf::Vector2f gTextScale(1.f/40.f, -1.f/40.f);
+
 //==============================================================================
 class Graph::Implementation
 {
@@ -46,7 +48,8 @@ public:
     std::vector<sf::VertexArray> mono_lane_arrows;
 
     std::vector<sf::CircleShape> waypoints;
-    std::vector<sf::Text> waypoints_text;
+    std::unordered_map<std::size_t, sf::Text> waypoints_text;
+    std::unordered_map<std::size_t, sf::Text> connector_waypoints_text;
     std::vector<Eigen::Vector2f> waypoint_p;
     std::vector<std::size_t> waypoint_indices;
   };
@@ -85,13 +88,13 @@ public:
     this->lane_width = lane_width;
     std::unordered_map<std::size_t, std::unordered_set<std::size_t>> used_lanes;
     std::unordered_set<std::size_t> used_vertices;
-
+    
     for (std::size_t i=0; i < graph.num_waypoints(); ++i)
     {
       const auto& waypoint = graph.get_waypoint(i);
       sf::Text text;
       text.setFont(font);
-      text.setCharacterSize(12);
+      text.setCharacterSize(24);
       if (waypoint.name())
       {
         std::string name = *waypoint.name();
@@ -102,14 +105,17 @@ public:
       }
       else
         text.setString(std::to_string(waypoint.index()));
+      
+      text.setScale(gTextScale);
+      
+      sf::FloatRect text_rect = text.getLocalBounds();
+      text.setOrigin(text_rect.width * 0.5f, text_rect.height * 0.5f);
       text.setPosition(waypoint.get_location().x(), waypoint.get_location().y());
 
-      //minor scale hack
-      text.setScale(sf::Vector2f(1.f/40.f, -1.f/40.f));
       text.setFillColor(sf::Color(192, 192, 192));
 
       auto& map_data = data[waypoint.get_map_name()];
-      map_data.waypoints_text.emplace_back(text);
+      map_data.waypoints_text.emplace(waypoint.index(), text);
     }
 
     for (std::size_t i=0; i < graph.num_lanes(); ++i)
@@ -123,8 +129,29 @@ public:
 
       if (w0.get_map_name() != w1.get_map_name())
       {
-        // TODO(MXG): We should do something to indicate when a waypoint is
-        // connected to another map.
+        // add text that tells of a connection to another level
+        auto& w0_map_data = data[w0.get_map_name()];
+        auto& w0_text = w0_map_data.waypoints_text[j0];
+
+        auto& w1_map_data = data[w1.get_map_name()];
+        auto& w1_text = w1_map_data.waypoints_text[j1];
+        std::string w1_str = w1_text.getString();
+        
+        sf::Text text;
+        text.setFont(font);
+        text.setCharacterSize(w0_text.getCharacterSize());
+        text.setColor(sf::Color(144,238,144));
+        text.setString("[" + w1.get_map_name() + "::" + w1_str + "]");
+
+        sf::FloatRect text_rect = text.getLocalBounds();
+        text.setOrigin(text_rect.width * 0.5f, text_rect.height * 0.5f);
+
+        sf::FloatRect w0_text_rect = w0_text.getLocalBounds();
+        text.setPosition(w0.get_location().x(), 
+          w0.get_location().y() + w0_text_rect.height * gTextScale.y);
+        text.setScale(gTextScale);
+        
+        w0_map_data.connector_waypoints_text.emplace(j0, text);
         continue;
       }
 
@@ -456,14 +483,48 @@ void Graph::draw(sf::RenderTarget& target, sf::RenderStates states) const
     target.draw(s, states);
 
   for (const auto& s : map_data.waypoints_text)
-    target.draw(s, states);
+    target.draw(s.second, states);
+
+  for (const auto& s : map_data.connector_waypoints_text)
+    target.draw(s.second, states);
 }
 
 void Graph::set_text_size(uint sz)
 {
-  auto& map_data = _pimpl->data.at(*_pimpl->current_map);
-  for (auto& s : map_data.waypoints_text)
-    s.setCharacterSize(sz);
+  for (auto& iter : _pimpl->data)
+  {
+    auto& map_data = iter.second;
+    for (auto& s : map_data.waypoints_text)
+    {
+      sf::Text& text = s.second;
+      text.setCharacterSize(sz);
+
+      sf::FloatRect text_rect = text.getLocalBounds();
+      text.setOrigin(text_rect.width * 0.5f, text_rect.height * 0.5f);
+    }
+
+    for (auto& s : map_data.connector_waypoints_text)
+    {
+      sf::Text& text = s.second;
+      text.setCharacterSize(sz);
+
+      sf::FloatRect text_rect = text.getLocalBounds();
+      text.setOrigin(text_rect.width * 0.5f, text_rect.height * 0.5f);
+      
+      sf::Text& parent_text = map_data.waypoints_text[s.first];
+      sf::FloatRect parent_rect = parent_text.getLocalBounds();
+      sf::Vector2f pos = parent_text.getPosition();
+      text.setPosition(pos.x, pos.y + parent_rect.height * gTextScale.y); 
+    }
+  }
+}
+
+std::vector<std::string> Graph::get_map_names()
+{
+  std::vector<std::string> names;
+  for (auto& s : _pimpl->data)
+    names.push_back(s.first);
+  return names;
 }
 
 } // namespace draw

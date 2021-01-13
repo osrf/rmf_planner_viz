@@ -60,7 +60,7 @@ int main(int argc, char* argv[])
   const std::string test_map_name = "test_map";
   if (argc == 2)
   {
-    std::cout << "Loading map file " << argv[1] << std::endl;
+    std::cout << "Loading nav_graph file " << argv[1] << std::endl;
     graph_0 = rmf_fleet_adapter::agv::parse_graph(
       argv[1], 
       traits);
@@ -124,7 +124,11 @@ int main(int argc, char* argv[])
   }
 
   rmf_planner_viz::draw::Graph graph_0_drawable(graph_0, 1.0, font);
-
+  std::vector<std::string> map_names = graph_0_drawable.get_map_names();
+  std::string chosen_map;
+  if (graph_0_drawable.current_map())
+    chosen_map = *graph_0_drawable.current_map();
+  
   std::shared_ptr<rmf_traffic::schedule::Database> database =
       std::make_shared<rmf_traffic::schedule::Database>();
 
@@ -253,34 +257,78 @@ int main(int argc, char* argv[])
         if (pick)
           graph_0_drawable.select(*pick);
       }
+
+      if (event.type == sf::Event::KeyReleased)
+      {
+        if (event.key.code == sf::Keyboard::F1)
+        {
+          for (uint i=0; i<map_names.size(); ++i)
+          {
+            if (map_names[i] != chosen_map)
+              continue;
+            if (i > 0)
+              chosen_map = map_names[i - 1];
+            else
+              chosen_map = map_names[map_names.size() - 1];
+            break;
+          }
+        }
+        if (event.key.code == sf::Keyboard::F2)
+        {
+          for (uint i=0; i<map_names.size(); ++i)
+          {
+            if (map_names[i] != chosen_map)
+              continue;
+            if (i < (map_names.size() - 1))
+              chosen_map = map_names[i + 1];
+            else
+              chosen_map = map_names[0];
+            break;
+          }
+        }
+      }
     }
 
     ImGui::SFML::Update(app_window, deltaClock.restart());
-    
-    static bool show_node_trajectories = true;
-    static std::vector<rmf_planner_viz::draw::Trajectory> trajectories_to_render;
+
 
     bool force_replan = false;
     if (ImGui::BeginMainMenuBar())
     {
       if (ImGui::BeginMenu("UI"))
       {
-        static int sz = 12;
+        static int sz = 24;
         if (ImGui::InputInt("Text size", &sz))
         {
           if (sz > 0)
-            graph_0_drawable.set_text_size(sz);
+            graph_0_drawable.set_text_size((uint)sz);
+        }
+        ImGui::Separator();
+        ImGui::NewLine();
+
+        ImGui::Text("Maps (Use keys F1/F2 to iterate through)");
+
+        for (uint i=0; i<map_names.size(); ++i)
+        {
+          bool activated = map_names[i] == chosen_map;
+          if (ImGui::RadioButton(map_names[i].c_str(), activated))
+            chosen_map = map_names[i];
         }
         ImGui::EndMenu();
       }
       ImGui::EndMainMenuBar();
     }
+    graph_0_drawable.choose_map(chosen_map);
+    
+    static bool show_node_trajectories = true;
+    static std::vector<rmf_planner_viz::draw::Trajectory> trajectories_to_render;
 
     bool startgoal_force_replan = rmf_planner_viz::draw::do_planner_presets(starts, goal, plan_start_timing);
     force_replan |= startgoal_force_replan;
 
     rmf_planner_viz::draw::do_planner_debug(
-      profile, planner_0, starts, goal, graph_0.num_waypoints(), planner_debug, progress, plan_start_timing,
+      profile, chosen_map,
+      planner_0, starts, goal, graph_0.num_waypoints(), planner_debug, progress, plan_start_timing,
       force_replan, show_node_trajectories, trajectories_to_render);
     
     ImGui::EndFrame();
