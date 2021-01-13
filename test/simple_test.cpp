@@ -187,10 +187,11 @@ int main()
 
 
   // set plans for the participants
-  const auto now = std::chrono::steady_clock::now();
+  using namespace std::chrono_literals;
+  auto plan_start_timing = std::chrono::steady_clock::now();
 
   std::vector<rmf_traffic::agv::Planner::Start> starts;
-  starts.emplace_back(now, 11, 0.0);
+  starts.emplace_back(plan_start_timing, 11, 0.0);
   // starts.emplace_back(now, 12, 0.0);
   // starts.emplace_back(now, 10, 0.0);
 
@@ -207,7 +208,7 @@ int main()
     planner_debug.begin(starts, goal, planner_0.get_default_options());
 
   rmf_planner_viz::draw::Schedule schedule_drawable(
-        database, 0.25, test_map_name, now);
+        database, 0.25, test_map_name, plan_start_timing);
 
   rmf_planner_viz::draw::Fit fit(
     {graph_0_drawable.bounds(), graph_1_drawable.bounds()}, 0.02);
@@ -257,9 +258,11 @@ int main()
     static bool show_node_trajectories = true;
     static std::vector<rmf_planner_viz::draw::Trajectory> trajectories_to_render;
 
+    bool force_replan = rmf_planner_viz::draw::do_planner_presets(starts, goal, plan_start_timing);
+
     rmf_planner_viz::draw::do_planner_debug(
-      profile, planner_0, starts, goal, planner_debug, progress, now,
-      show_node_trajectories, trajectories_to_render);
+      profile, planner_0, starts, goal, graph_0.num_waypoints(), planner_debug, progress, plan_start_timing,
+      force_replan, show_node_trajectories, trajectories_to_render);
     
     ImGui::EndFrame();
 
