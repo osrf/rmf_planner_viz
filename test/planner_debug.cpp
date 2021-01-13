@@ -402,25 +402,25 @@ bool do_planner_presets(
 {
   bool reset = false;
   ImGui::SetNextWindowPos(ImVec2(800, 120), ImGuiCond_FirstUseEver);
-  ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_FirstUseEver);
+  ImGui::SetNextWindowPos(ImVec2(0, 50), ImGuiCond_FirstUseEver);
   
-  ImGui::Begin("Presets", nullptr, ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_AlwaysAutoResize);
+  ImGui::Begin("Start/Goal Presets", nullptr, ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_AlwaysAutoResize);
   
-  if (ImGui::Button("Preset #0"))
+  if (ImGui::Button("Start/Goal Preset #0"))
   {
     starts.clear();
     starts.emplace_back(plan_start_timing, 11, 0.0);
     goal = rmf_traffic::agv::Planner::Goal(3);
     reset = true;
   }
-  if (ImGui::Button("Preset #1"))
+  if (ImGui::Button("Start/Goal Preset #1"))
   {
     starts.clear();
     starts.emplace_back(plan_start_timing, 10, 0.0);
     goal = rmf_traffic::agv::Planner::Goal(3);
     reset = true;
   }
-  if (ImGui::Button("Preset #2"))
+  if (ImGui::Button("Start/Goal Preset #2"))
   {
     starts.clear();
     starts.emplace_back(plan_start_timing, 9, 0.0);

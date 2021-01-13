@@ -11,14 +11,16 @@ add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
 find_package(ament_cmake REQUIRED)
+find_package(rmf_fleet_adapter REQUIRED)
 find_package(rmf_traffic REQUIRED)
 find_package(SFML COMPONENTS graphics window system REQUIRED)
 find_package(ImGui-SFML)
 
+
 include(GNUInstallDirs)
 
 add_library(
-  rmf_planning_viz
+  rmf_planning_viz SHARED
     src/rmf_planner_viz/draw/ColorPicker.cpp
     src/rmf_planner_viz/draw/Fit.cpp
     src/rmf_planner_viz/draw/Graph.cpp
@@ -47,7 +49,14 @@ target_link_libraries(
   simple_test
   PUBLIC
     rmf_planning_viz
+    rmf_fleet_adapter::rmf_fleet_adapter
     ImGui-SFML::ImGui-SFML
+)
+
+target_include_directories(
+  simple_test
+  PUBLIC
+    rmf_fleet_adapter::rmf_fleet_adapter
 )
 
 add_executable(test_trajectory test/test_trajectory.cpp)

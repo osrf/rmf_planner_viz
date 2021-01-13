@@ -91,6 +91,7 @@ public:
       const auto& waypoint = graph.get_waypoint(i);
       sf::Text text;
       text.setFont(font);
+      text.setCharacterSize(12);
       if (waypoint.name())
       {
         std::string name = *waypoint.name();
@@ -105,7 +106,7 @@ public:
 
       //minor scale hack
       text.setScale(sf::Vector2f(1.f/40.f, -1.f/40.f));
-      text.setFillColor(sf::Color::Cyan);
+      text.setFillColor(sf::Color(192, 192, 192));
 
       auto& map_data = data[waypoint.get_map_name()];
       map_data.waypoints_text.emplace_back(text);
@@ -456,6 +457,13 @@ void Graph::draw(sf::RenderTarget& target, sf::RenderStates states) const
 
   for (const auto& s : map_data.waypoints_text)
     target.draw(s, states);
+}
+
+void Graph::set_text_size(uint sz)
+{
+  auto& map_data = _pimpl->data.at(*_pimpl->current_map);
+  for (auto& s : map_data.waypoints_text)
+    s.setCharacterSize(sz);
 }
 
 } // namespace draw

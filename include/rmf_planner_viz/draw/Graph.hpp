@@ -67,6 +67,7 @@ public:
 
   rmf_utils::optional<Pick> selected() const;
 
+  void set_text_size(uint sz);
 protected:
 
   void draw(sf::RenderTarget& target, sf::RenderStates states) const final;
