@@ -185,6 +185,52 @@ void IMDraw::draw_arrow(const sf::Vector2f& start, const sf::Vector2f& end, cons
   g_vertexarrays.push_back(vtx_arr);
 }
 
+void IMDraw::draw_aabb(const sf::Vector2f& box_min, const sf::Vector2f& box_max, const sf::Color& color)
+{
+  if (g_vertexarrays.size() >= VERTEX_ARRAYS_LIMIT)
+  {
+    std::cout << "Vertex array limit exceeded" << std::endl;
+    return;
+  }
+
+  sf::VertexArray vtx_arr(sf::Lines);
+
+  sf::Vertex v;
+  v.color = color;
+
+  v.position = box_min;
+  vtx_arr.append(v);
+
+  v.position.x = box_max.x;
+  v.position.y = box_min.y;
+  vtx_arr.append(v);
+
+  v.position.x = box_max.x;
+  v.position.y = box_min.y;
+  vtx_arr.append(v);
+
+  v.position.x = box_max.x;
+  v.position.y = box_max.y;
+  vtx_arr.append(v);
+
+  v.position.x = box_max.x;
+  v.position.y = box_max.y;
+  vtx_arr.append(v);
+
+  v.position.x = box_min.x;
+  v.position.y = box_max.y;
+  vtx_arr.append(v);
+
+  v.position.x = box_min.x;
+  v.position.y = box_max.y;
+  vtx_arr.append(v);
+
+  v.position = box_min;
+  vtx_arr.append(v);
+
+  g_vertexarrays.push_back(vtx_arr);
+}
+
 void IMDraw::flush_and_render(sf::RenderWindow& app_window, const sf::Transform& tx_flipped_2d)
 {
   for (auto& single_array : g_vertexarrays)

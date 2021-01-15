@@ -225,7 +225,14 @@ int main(int argc, char* argv[])
         sf::Style::Default);
 
   app_window.resetGLStates();
-
+  sf::View max_cam_view = app_window.getView();
+  sf::Vector2f max_cam_size = max_cam_view.getSize();
+  printf("max size: %f, %f\n", max_cam_view.getSize().x, max_cam_view.getSize().y);
+  sf::Vector2f min_cam_size = 0.05f * max_cam_size;
+  float cam_zoom = 1.f;
+  sf::Vector2f min_lookat(max_cam_size * 0.125f);
+  sf::Vector2f max_lookat(max_cam_size * 0.875f);
+  
   ImGui::SFML::Init(app_window);
 
   sf::Clock deltaClock;
@@ -287,6 +294,117 @@ int main(int argc, char* argv[])
           }
         }
       }
+
+      static bool cam_mouse_down = false;
+      static sf::Vector2f cam_mouse_down_origin;
+      if (event.type == sf::Event::MouseButtonPressed)
+      {
+        cam_mouse_down = true;
+
+        //printf("mousebtn pos: %d %d\n", event.mouseButton.x, event.mouseButton.y);
+        //cam_mouse_down_origin = app_window.mapPixelToCoords(sf::Vector2i(event.mouseButton.x, event.mouseButton.y));
+        cam_mouse_down_origin = sf::Vector2f(event.mouseButton.x, event.mouseButton.y);
+        // cam_mouse_down_origin.x = (int)projected.x;
+        // cam_mouse_down_origin.y = (int)projected.y;
+        //sf::Vector2f projected(event.mouseButton.x, event.mouseButton.y);
+        //printf("prjected: %f %f\n", projected.x, projected.y);
+      }
+
+      if (cam_mouse_down && event.type == sf::Event::MouseMoved)
+      {
+        // sf::View camview = app_window.getView();
+        // auto center = camview.getCenter();
+
+        //sf::Vector2f projected = app_window.mapPixelToCoords(sf::Vector2i(event.mouseMove.x, event.mouseMove.y));
+        sf::Vector2f projected(event.mouseMove.x, event.mouseMove.y);
+        printf("prjected: %f %f\n", projected.x, projected.y);
+        printf("cam_mouse_down_origin: %f %f\n", cam_mouse_down_origin.x, cam_mouse_down_origin.y);
+        // camview.setCenter(projected);
+        // app_window.setView(camview);
+
+        sf::View camview = app_window.getView();
+        auto center = camview.getCenter();
+        auto diff = projected - cam_mouse_down_origin;
+
+        if (diff.x != 0.f || diff.y != 0.f)
+        {
+          printf("%f %f\n", diff.x, diff.y);
+          float min_move_speed = 0.75f;
+          float max_move_speed = 3.0f;
+          float speed = min_move_speed + cam_zoom * (max_move_speed - min_move_speed);
+          auto new_center = center + diff * speed;
+
+          if (new_center.x < min_lookat.x)
+            new_center.x = min_lookat.x;
+          if (new_center.x > max_lookat.x)
+            new_center.x = max_lookat.x;
+          if (new_center.y < min_lookat.y)
+            new_center.y = min_lookat.y;
+          if (new_center.y > max_lookat.y)
+            new_center.y = max_lookat.y;
+
+          camview.setCenter(new_center);
+          app_window.setView(camview);
+        }
+
+        sf::Mouse::setPosition(sf::Vector2i(cam_mouse_down_origin.x, cam_mouse_down_origin.y), app_window);
+      }
+
+      if (event.type == sf::Event::MouseButtonReleased)
+        cam_mouse_down = false;
+
+
+      if (event.type == sf::Event::MouseWheelScrolled)
+      {
+        sf::View camview = app_window.getView();
+        float dt = deltaClock.getElapsedTime().asSeconds();
+
+        if (event.mouseWheelScroll.delta > 0) //scroll up
+          cam_zoom -= dt * 100.0f;
+        if (event.mouseWheelScroll.delta < 0) //scroll down
+          cam_zoom += dt * 100.0f;
+
+        if (cam_zoom < 0.f)
+            cam_zoom = 0.f;
+        if (cam_zoom > 1.f)
+          cam_zoom = 1.f;
+        
+        auto newsize = min_cam_size + cam_zoom * (max_cam_size - min_cam_size);
+        camview.setSize(newsize);
+        
+        app_window.setView(camview);
+      }
+
+      if (event.type == sf::Event::KeyPressed)
+      {
+        float move_x = 30.0f, move_y = 30.f;
+        auto move_view = [&app_window](sf::Vector2f offset)
+        {
+          sf::View camview = app_window.getView();
+          auto center = camview.getCenter();
+          camview.setCenter(sf::Vector2f(center.x + offset.x, center.y + offset.y));
+          app_window.setView(camview);
+        };
+
+        if (event.key.code == sf::Keyboard::W || event.key.code == sf::Keyboard::Up)
+          move_view(sf::Vector2f(0.0f, -move_y));
+        if (event.key.code == sf::Keyboard::S || event.key.code == sf::Keyboard::Down)
+          move_view(sf::Vector2f(0.0f, move_y));
+        if (event.key.code == sf::Keyboard::A || event.key.code == sf::Keyboard::Left)
+          move_view(sf::Vector2f(-move_x, 0.0f));
+        if (event.key.code == sf::Keyboard::D || event.key.code == sf::Keyboard::Right)
+          move_view(sf::Vector2f(move_x, 0.0f));
+
+        if (event.key.code == sf::Keyboard::Z)
+        {
+          sf::View camview = app_window.getView();
+          camview.setSize(max_cam_size);
+          camview.setCenter(0.5f * max_cam_size);
+          app_window.setView(camview);
+          
+          cam_zoom = 1.0f;
+        }
+      }
     }
 
     ImGui::SFML::Update(app_window, deltaClock.restart());
@@ -314,6 +432,11 @@ int main(int argc, char* argv[])
           if (ImGui::RadioButton(map_names[i].c_str(), activated))
             chosen_map = map_names[i];
         }
+
+        ImGui::NewLine();
+
+        ImGui::Text("Use WASD/mousedrag to move camera, Z to reset");
+
         ImGui::EndMenu();
       }
       ImGui::EndMainMenuBar();
@@ -348,7 +471,9 @@ int main(int argc, char* argv[])
         app_window.draw(trajectory, states);
     }
 
-    rmf_planner_viz::draw::IMDraw::flush_and_render(app_window, states.transform);
+    rmf_planner_viz::draw::IMDraw::draw_aabb(min_lookat, max_lookat, sf::Color::Red);
+    sf::Transform ident;
+    rmf_planner_viz::draw::IMDraw::flush_and_render(app_window, ident);
     
 
     ImGui::SFML::Render(app_window);
