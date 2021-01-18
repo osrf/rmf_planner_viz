@@ -30,6 +30,7 @@ add_library(
     src/rmf_planner_viz/draw/Schedule.cpp
     src/rmf_planner_viz/draw/Trajectory.cpp
     src/rmf_planner_viz/draw/IMDraw.cpp
+    src/rmf_planner_viz/draw/Camera.cpp
 )
 
 target_link_libraries(

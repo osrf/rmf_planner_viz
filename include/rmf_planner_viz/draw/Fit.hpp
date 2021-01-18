@@ -71,6 +71,8 @@ public:
   sf::Transform compute_transform(
       sf::Vector2u render_size) const;
 
+  Bounds get_bounds() const;
+
 private:
   float _margin;
   Bounds _bounds;

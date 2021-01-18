@@ -24,6 +24,7 @@
 #include <rmf_planner_viz/draw/Schedule.hpp>
 #include <rmf_planner_viz/draw/IMDraw.hpp>
 #include <rmf_planner_viz/draw/Trajectory.hpp>
+#include <rmf_planner_viz/draw/Camera.hpp>
 
 #include <rmf_traffic/schedule/Database.hpp>
 #include <rmf_traffic/agv/Planner.hpp>
@@ -225,7 +226,25 @@ int main(int argc, char* argv[])
         sf::Style::Default);
 
   app_window.resetGLStates();
+  app_window.setFramerateLimit(60);
 
+  sf::View max_cam_view = app_window.getView();
+  sf::Vector2f sz = max_cam_view.getSize();
+
+  int textsz = 24;
+
+  auto bounds = fit.get_bounds();
+  auto s = bounds.max - bounds.min;
+  //printf("bounds sz: %f %f\n", s.x(), s.y());
+  double max_length_side = s.x() < s.y() ? s.y() : s.x();
+  if (max_length_side < 20.0)
+  {
+    textsz = 12;
+    graph_0_drawable.set_text_size(textsz);
+  }
+    
+  rmf_planner_viz::draw::Camera camera(sz);
+  
   ImGui::SFML::Init(app_window);
 
   sf::Clock deltaClock;
@@ -256,6 +275,8 @@ int main(int argc, char* argv[])
         const auto pick = graph_0_drawable.pick(p.x, p.y);
         if (pick)
           graph_0_drawable.select(*pick);
+        else
+          camera.on_mouse_button_pressed(event.mouseButton.x, event.mouseButton.y);
       }
 
       if (event.type == sf::Event::KeyReleased)
@@ -287,21 +308,32 @@ int main(int argc, char* argv[])
           }
         }
       }
+
+      if (event.type == sf::Event::MouseButtonPressed)
+        camera.on_mouse_button_pressed(event.mouseButton.x, event.mouseButton.y);
+
+      if (event.type == sf::Event::MouseButtonReleased)
+        camera.on_mouse_button_released();
+
+      if (event.type == sf::Event::MouseWheelScrolled)
+        camera.on_mouse_wheel_scrolled(event.mouseWheelScroll);
     }
 
-    ImGui::SFML::Update(app_window, deltaClock.restart());
+    auto& io = ImGui::GetIO();
+    if (!io.WantCaptureMouse)
+      camera.update(deltaClock.getElapsedTime().asSeconds(), app_window);
 
+    ImGui::SFML::Update(app_window, deltaClock.restart());
 
     bool force_replan = false;
     if (ImGui::BeginMainMenuBar())
     {
       if (ImGui::BeginMenu("UI"))
       {
-        static int sz = 24;
-        if (ImGui::InputInt("Text size", &sz))
+        if (ImGui::InputInt("Text size", &textsz))
         {
-          if (sz > 0)
-            graph_0_drawable.set_text_size((uint)sz);
+          if (textsz > 0)
+            graph_0_drawable.set_text_size((uint)textsz);
         }
         ImGui::Separator();
         ImGui::NewLine();
@@ -314,6 +346,13 @@ int main(int argc, char* argv[])
           if (ImGui::RadioButton(map_names[i].c_str(), activated))
             chosen_map = map_names[i];
         }
+
+        ImGui::NewLine();
+
+        ImGui::Text("WASD/mousedrag to move camera");
+        ImGui::Text("MouseWheel scroll to zoom in/out");
+        ImGui::Text("Z to reset");
+
         ImGui::EndMenu();
       }
       ImGui::EndMainMenuBar();
@@ -348,7 +387,8 @@ int main(int argc, char* argv[])
         app_window.draw(trajectory, states);
     }
 
-    rmf_planner_viz::draw::IMDraw::flush_and_render(app_window, states.transform);
+    sf::Transform ident;
+    rmf_planner_viz::draw::IMDraw::flush_and_render(app_window, ident);
     
 
     ImGui::SFML::Render(app_window);
