@@ -41,7 +41,7 @@ void Camera::on_mouse_button_released()
   _mouse_btn_down = false;
 }
 
-void Camera::on_mouse_wheel_scrolled(const sf::Event::MouseWheelScrollEvent& evt, float dt)
+void Camera::on_mouse_wheel_scrolled(const sf::Event::MouseWheelScrollEvent& evt)
 {
   if (evt.delta > 0) //scroll up
     _scrolled_up = true;
@@ -94,10 +94,11 @@ void Camera::update(float dt, sf::RenderWindow& app_window)
     center.y = _max_lookat.y;
   
   // handle zoom
+  float scrollspeed = 10.f;
   if (_scrolled_up)
-    _zoom -= dt * 100.0f;
-  else
-    _zoom += dt * 100.0f;
+    _zoom -= dt * scrollspeed;
+  else if (_scrolled_down)
+    _zoom += dt * scrollspeed;
   _scrolled_up = _scrolled_down = false;
 
   // clamp zoom

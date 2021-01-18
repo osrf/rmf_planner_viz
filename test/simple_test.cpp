@@ -300,6 +300,9 @@ int main(int argc, char* argv[])
 
       if (event.type == sf::Event::MouseButtonReleased)
         camera.on_mouse_button_released();
+
+      if (event.type == sf::Event::MouseWheelScrolled)
+        camera.on_mouse_wheel_scrolled(event.mouseWheelScroll);
     }
 
     camera.update(deltaClock.getElapsedTime().asSeconds(), app_window);

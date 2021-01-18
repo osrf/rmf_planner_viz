@@ -39,7 +39,7 @@ public:
 
   void on_mouse_button_pressed(int mouseX, int mouseY);
   void on_mouse_button_released();
-  void on_mouse_wheel_scrolled(const sf::Event::MouseWheelScrollEvent& evt, float dt);
+  void on_mouse_wheel_scrolled(const sf::Event::MouseWheelScrollEvent& evt);
 
   void update(float dt, sf::RenderWindow& app_window);
   
