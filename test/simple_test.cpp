@@ -229,7 +229,21 @@ int main(int argc, char* argv[])
   app_window.setFramerateLimit(60);
 
   sf::View max_cam_view = app_window.getView();
-  rmf_planner_viz::draw::Camera camera(max_cam_view.getSize());
+  sf::Vector2f sz = max_cam_view.getSize();
+
+  int textsz = 24;
+
+  auto bounds = fit.get_bounds();
+  auto s = bounds.max - bounds.min;
+  //printf("bounds sz: %f %f\n", s.x(), s.y());
+  double max_length_side = s.x() < s.y() ? s.y() : s.x();
+  if (max_length_side < 20.0)
+  {
+    textsz = 12;
+    graph_0_drawable.set_text_size(textsz);
+  }
+    
+  rmf_planner_viz::draw::Camera camera(sz);
   
   ImGui::SFML::Init(app_window);
 
@@ -313,11 +327,10 @@ int main(int argc, char* argv[])
     {
       if (ImGui::BeginMenu("UI"))
       {
-        static int sz = 24;
-        if (ImGui::InputInt("Text size", &sz))
+        if (ImGui::InputInt("Text size", &textsz))
         {
-          if (sz > 0)
-            graph_0_drawable.set_text_size((uint)sz);
+          if (textsz > 0)
+            graph_0_drawable.set_text_size((uint)textsz);
         }
         ImGui::Separator();
         ImGui::NewLine();
@@ -333,7 +346,9 @@ int main(int argc, char* argv[])
 
         ImGui::NewLine();
 
-        ImGui::Text("Use WASD/mousedrag to move camera, Z to reset");
+        ImGui::Text("WASD/mousedrag to move camera");
+        ImGui::Text("MouseWheel scroll to zoom in/out");
+        ImGui::Text("Z to reset");
 
         ImGui::EndMenu();
       }

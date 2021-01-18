@@ -75,7 +75,9 @@ void Camera::update(float dt, sf::RenderWindow& app_window)
   {
     sf::Vector2i mouse_pos = sf::Mouse::getPosition(app_window);
     auto diff = sf::Vector2f((float)mouse_pos.x, (float)mouse_pos.y) - _mouse_down_origin;
-    center = center + diff;
+    float min_drag_speed = 0.25f, max_drag_speed = 1.f;
+    float drag_speed = min_drag_speed + _zoom * (max_drag_speed - min_drag_speed);
+    center = center + diff * drag_speed;
     
     //printf("diff: %f %f\n", diff.x, diff.y);
 
