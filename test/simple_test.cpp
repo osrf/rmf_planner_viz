@@ -319,7 +319,10 @@ int main(int argc, char* argv[])
         camera.on_mouse_wheel_scrolled(event.mouseWheelScroll);
     }
 
-    camera.update(deltaClock.getElapsedTime().asSeconds(), app_window);
+    auto& io = ImGui::GetIO();
+    if (!io.WantCaptureMouse)
+      camera.update(deltaClock.getElapsedTime().asSeconds(), app_window);
+
     ImGui::SFML::Update(app_window, deltaClock.restart());
 
     bool force_replan = false;
