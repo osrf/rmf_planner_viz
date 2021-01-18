@@ -33,7 +33,6 @@ void Camera::on_mouse_button_pressed(int mouseX, int mouseY)
 {
   _mouse_btn_down = true;
   _mouse_down_origin = sf::Vector2f(mouseX, mouseY);
-  //cam_mouse_down_origin = app_window.mapPixelToCoords(sf::Vector2i(event.mouseButton.x, event.mouseButton.y));
 }
 
 void Camera::on_mouse_button_released()

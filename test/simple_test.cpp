@@ -307,7 +307,6 @@ int main(int argc, char* argv[])
 
     camera.update(deltaClock.getElapsedTime().asSeconds(), app_window);
     ImGui::SFML::Update(app_window, deltaClock.restart());
-    
 
     bool force_replan = false;
     if (ImGui::BeginMainMenuBar())
