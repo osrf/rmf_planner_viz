@@ -1,0 +1,34 @@
+map: /office/nav_graphs/0.yaml
+samples: 100
+
+robots:
+  main:
+    traits:
+      linear: {velocity: 0.5, acceleration: 2.0}
+      angular: {velocity: 0.75, acceleration: 1.5}
+    profile:
+      footprint: {shape: circle, radius: 0.2}
+
+obstacles:
+
+  - robot: main
+    start:
+      initial_time: 0
+      initial_waypoint: tinyRobot2_charger
+      initial_orientation: 90
+    goal: lounge
+
+  - robot: main
+    start:
+      initial_time: 30
+      initial_waypoint: supplies
+      initial_orientation: 0
+    goal: tinyRobot2_charger
+
+plan:
+  robot: main
+  start:
+    initial_time: 0
+    initial_waypoint: hardware_2
+    initial_orientation: 0
+  goal: supplies

@@ -1,0 +1,34 @@
+map: /airport_terminal/nav_graphs/1.yaml
+samples: 1
+
+robots:
+  main:
+    traits:
+      linear: {velocity: 0.5, acceleration: 2.0}
+      angular: {velocity: 0.75, acceleration: 1.5}
+    profile:
+      footprint: {shape: circle, radius: 0.2}
+
+obstacles:
+
+  - robot: main
+    start:
+      initial_time: 0
+      initial_waypoint: s11
+      initial_orientation: 0
+    goal: n24
+
+  # - robot: main
+  #   start:
+  #     initial_time: 0
+  #     initial_waypoint: s11
+  #     initial_orientation: 0
+  #   goal: n25
+
+plan:
+  robot: main
+  start:
+    initial_time: 2
+    initial_waypoint: n08
+    initial_orientation: 0
+  goal: n25

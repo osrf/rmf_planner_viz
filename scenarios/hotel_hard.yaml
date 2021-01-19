@@ -1,0 +1,27 @@
+map: /hotel/nav_graphs/0.yaml
+samples: 1
+
+robots:
+  main:
+    traits:
+      linear: {velocity: 0.5, acceleration: 2.0}
+      angular: {velocity: 0.75, acceleration: 1.5}
+    profile:
+      footprint: {shape: circle, radius: 0.2}
+
+obstacles:
+
+  - robot: main
+    start:
+      initial_time: 0
+      initial_waypoint: l1_restroom
+      initial_orientation: 0
+    goal: guest1
+
+plan:
+  robot: main
+  start:
+    initial_time: 0
+    initial_waypoint: guest1
+    initial_orientation: 0
+  goal: l1_restroom
