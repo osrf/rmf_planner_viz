@@ -189,5 +189,10 @@ sf::Transform Fit::compute_transform(
   return output;
 }
 
+Fit::Bounds Fit::get_bounds() const
+{
+  return _bounds;
+}
+
 } // namespace draw
 } // namespace rmf_planner_viz

@@ -11,9 +11,7 @@ add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
 find_package(ament_cmake REQUIRED)
-find_package(rmf_battery REQUIRED)
 find_package(rmf_fleet_adapter REQUIRED)
-find_package(rmf_task REQUIRED)
 find_package(rmf_traffic REQUIRED)
 find_package(SFML COMPONENTS graphics window system REQUIRED)
 find_package(ImGui-SFML)
@@ -59,6 +57,7 @@ add_library(
     src/rmf_planner_viz/draw/Schedule.cpp
     src/rmf_planner_viz/draw/Trajectory.cpp
     src/rmf_planner_viz/draw/IMDraw.cpp
+    src/rmf_planner_viz/draw/Camera.cpp
 )
 
 target_link_libraries(
