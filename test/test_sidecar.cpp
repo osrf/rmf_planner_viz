@@ -44,7 +44,44 @@
 #ifdef PROFILING_USE_RDTSC
 #include <cpuid.h>
 #include <x86intrin.h>
+
+//use macros for to keep things inlined and not having to deal with types
+uint64 get_start_time()
+{
+  int v = 0; \
+  __cpuid(v,v,v,v,v);
+  uint64_t tsc = __rdtsc();
+  return tsc;
+}
+
+inline uint64 get_start_time()
+{
+  int v = 0;
+  __cpuid(v,v,v,v,v);
+  uint64_t tsc = __rdtsc();
+  return tsc;
+}
+
+inline uint64 get_end_time()
+{
+  uint64_t tsc = __rdtsc();
+  return tsc;
+}
+
+#else
+inline auto get_start_time()
+{
+  return std::chrono::high_resolution_clock::now();
+}
+
+inline auto get_end_time()
+{
+  return std::chrono::high_resolution_clock::now();
+}
 #endif
+
+
+
 
 void draw_fcl_motion(fcl::MotionBase<double>* motion, const sf::Color& color = sf::Color(255, 255, 255, 255))
 {
@@ -299,12 +336,12 @@ int main()
 
       // collision
       static bool use_fcl = false;
-      if (presets.size() && current_preset == (presets.size() - 1))
+      if (presets.size() && current_preset == ((int)presets.size() - 1))
         ImGui::Checkbox("Use FCL only", &use_fcl);
       else
         use_fcl = false;
 
-      if (use_fcl && presets.size() && current_preset == (presets.size() - 1))
+      if (use_fcl && presets.size() && current_preset == ((int)presets.size() - 1))
       {
         auto& preset = presets[current_preset];
 
@@ -317,20 +354,13 @@ int main()
         fcl::ContinuousCollisionRequestd request;
         request.ccd_solver_type = fcl::CCDC_CONSERVATIVE_ADVANCEMENT;
         request.gjk_solver_type = fcl::GST_LIBCCD;
-#ifdef PROFILING_USE_RDTSC
-        int v = 0;
-        __cpuid(v,v,v,v,v);
-        uint64_t start = __rdtsc();
-#else
-        auto start = std::chrono::high_resolution_clock::now();
-#endif 
+
+        auto start = get_start_time();
+
         fcl::ContinuousCollisionResultd result;
         fcl::collide(&obj_a, &obj_b, request, result);
-#ifdef PROFILING_USE_RDTSC
-        uint64_t end = __rdtsc();
-#else
-        auto end = std::chrono::high_resolution_clock::now();
-#endif
+
+        auto end = get_end_time();
         if (result.is_collide)
         {
           ImGui::Text("Collide! TOI: %f", result.time_of_contact);
@@ -346,9 +376,6 @@ int main()
         ImGui::Text("Clock cycles: %010llu", end - start);
 #else
         auto duration = end - start;
-        
-        //std::chrono::duration<double, std::nano> dur = end - start;
-        //std::chrono::duration<double, std::micro> dur = end - start;
         std::chrono::duration<double, std::milli> dur = end - start;
         double val = dur.count();
         ImGui::Text("Time taken (ms): %.10g", val);
@@ -356,14 +383,7 @@ int main()
       }
       else if (preset_type == PRESET_SPLINEMOTION)
       {
-#ifdef PROFILING_USE_RDTSC
-        int v = 0;
-        __cpuid(v,v,v,v,v);
-        uint64_t start = __rdtsc();
-#else
-        auto start = std::chrono::high_resolution_clock::now();
-#endif
-
+        auto start = get_start_time();
         double toi = 0.0;
         uint dist_checks = 0;
         bool collide = collide_seperable_circles(
@@ -371,11 +391,8 @@ int main()
           *(fcl::SplineMotion<double>*)motion_b.get(),
           a_shapes, b_shapes,
           toi, dist_checks, 120, (double)tolerance);
-#ifdef PROFILING_USE_RDTSC
-        uint64_t end = __rdtsc();
-#else
-        auto end = std::chrono::high_resolution_clock::now();
-#endif
+
+        auto end = get_end_time();
         if (collide)
         {
           ImGui::Text("Collide! TOI: %f", toi);
@@ -419,6 +436,9 @@ int main()
         draw_robot_on_spline(motion_a.get(), interp, a_shapes, sf::Color::Red);
         draw_robot_on_spline(motion_b.get(), interp, b_shapes, sf::Color::Green);
       }
+      // reset the motions
+      motion_a->integrate(0.0);
+      motion_b->integrate(0.0);
     }
 
     static bool draw_axis = false;
