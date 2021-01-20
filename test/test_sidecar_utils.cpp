@@ -458,6 +458,22 @@ std::vector<Preset> setup_presets()
     presets.push_back(p);
   }
 
+  /*** Single body ***/
+  {
+    Preset p;
+    p._description = "Single body straight lines";
+    p._type = PRESET_SPLINEMOTION;
+
+    p.a_shapes.emplace_back(identity, 0.5);
+    p.b_shapes.emplace_back(identity, 0.5);
+
+    p.a_start = Eigen::Vector3d(-3,0,0);
+    p.a_end = Eigen::Vector3d(3,0,0);
+
+    p.b_start = Eigen::Vector3d(0, -4, 0);
+    p.b_end = Eigen::Vector3d(0, 5, 0);
+    presets.push_back(p);
+  }
   return presets;
 }
 

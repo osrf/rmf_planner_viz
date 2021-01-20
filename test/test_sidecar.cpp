@@ -298,7 +298,63 @@ int main()
       sf::Color toi_red_color(178, 34, 34);
 
       // collision
-      if (preset_type == PRESET_SPLINEMOTION)
+      static bool use_fcl = false;
+      if (presets.size() && current_preset == (presets.size() - 1))
+        ImGui::Checkbox("Use FCL only", &use_fcl);
+      else
+        use_fcl = false;
+
+      if (use_fcl && presets.size() && current_preset == (presets.size() - 1))
+      {
+        auto& preset = presets[current_preset];
+
+        auto shape_a = std::make_shared<fcl::Sphered>(preset.a_shapes[0]._radius);
+        auto shape_b = std::make_shared<fcl::Sphered>(preset.b_shapes[0]._radius);
+        
+        const auto obj_a = fcl::ContinuousCollisionObjectd(shape_a, motion_a);
+        const auto obj_b = fcl::ContinuousCollisionObjectd(shape_b, motion_b);
+
+        fcl::ContinuousCollisionRequestd request;
+        request.ccd_solver_type = fcl::CCDC_CONSERVATIVE_ADVANCEMENT;
+        request.gjk_solver_type = fcl::GST_LIBCCD;
+#ifdef PROFILING_USE_RDTSC
+        int v = 0;
+        __cpuid(v,v,v,v,v);
+        uint64_t start = __rdtsc();
+#else
+        auto start = std::chrono::high_resolution_clock::now();
+#endif 
+        fcl::ContinuousCollisionResultd result;
+        fcl::collide(&obj_a, &obj_b, request, result);
+#ifdef PROFILING_USE_RDTSC
+        uint64_t end = __rdtsc();
+#else
+        auto end = std::chrono::high_resolution_clock::now();
+#endif
+        if (result.is_collide)
+        {
+          ImGui::Text("Collide! TOI: %f", result.time_of_contact);
+          //if (draw_toi_shapes)
+          { 
+            draw_robot_on_spline(motion_a.get(), result.time_of_contact, a_shapes, toi_red_color);
+            draw_robot_on_spline(motion_b.get(), result.time_of_contact, b_shapes, toi_green_color);
+          }
+        }
+        else
+          ImGui::Text("No collision");
+#ifdef PROFILING_USE_RDTSC
+        ImGui::Text("Clock cycles: %010llu", end - start);
+#else
+        auto duration = end - start;
+        
+        //std::chrono::duration<double, std::nano> dur = end - start;
+        //std::chrono::duration<double, std::micro> dur = end - start;
+        std::chrono::duration<double, std::milli> dur = end - start;
+        double val = dur.count();
+        ImGui::Text("Time taken (ms): %.10g", val);
+#endif
+      }
+      else if (preset_type == PRESET_SPLINEMOTION)
       {
 #ifdef PROFILING_USE_RDTSC
         int v = 0;
