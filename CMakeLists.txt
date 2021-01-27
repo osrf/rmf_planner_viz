@@ -15,7 +15,7 @@ find_package(rmf_fleet_adapter REQUIRED)
 find_package(rmf_traffic REQUIRED)
 find_package(SFML COMPONENTS graphics window system REQUIRED)
 find_package(ImGui-SFML)
-find_package(rmf_performance_tests REQUIRED)
+find_package(rmf_performance_tests)
 
 include(GNUInstallDirs)
 
@@ -60,22 +60,28 @@ target_include_directories(
     rmf_fleet_adapter::rmf_fleet_adapter
 )
 
-add_executable(performance_test test/performance_test.cpp test/planner_debug.cpp)
-target_link_libraries(
+if (rmf_performance_tests_FOUND)
+  add_executable(performance_test
+    test/performance_test.cpp
+    test/planner_debug.cpp
+  )
+
+  target_link_libraries(
     performance_test
     PUBLIC
-    rmf_planning_viz
-    rmf_fleet_adapter::rmf_fleet_adapter
-    ImGui-SFML::ImGui-SFML
-    rmf_performance_tests::rmf_performance_tests
-)
+      rmf_planning_viz
+      rmf_fleet_adapter::rmf_fleet_adapter
+      ImGui-SFML::ImGui-SFML
+      rmf_performance_tests::rmf_performance_tests
+  )
 
-target_include_directories(
+  target_include_directories(
     performance_test
     PUBLIC
       rmf_fleet_adapter::rmf_fleet_adapter
       rmf_performance_tests::rmf_performance_tests
-)
+  )
+endif()
 
 add_executable(test_trajectory test/test_trajectory.cpp)
 target_link_libraries(
