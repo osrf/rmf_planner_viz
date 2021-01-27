@@ -25,7 +25,6 @@
 #include <rmf_planner_viz/draw/IMDraw.hpp>
 #include <rmf_planner_viz/draw/Trajectory.hpp>
 
-#include <rmf_fleet_adapter/agv/parse_graph.hpp>
 #include <rmf_performance_tests/rmf_performance_tests.hpp>
 
 #include "imgui-SFML.h"
@@ -55,17 +54,13 @@ int main(int argc, char* argv[])
   {
     parse_scenario(argv[1], scenario);
   }
-  catch (std::runtime_error e)
+  catch (std::runtime_error& e)
   {
     std::cout << e.what() << std::endl;
     return 0;
   }
 
   using namespace std::chrono_literals;
-
-  const std::string map_file = rmf_performance_tests::get_map_directory() +
-    scenario.map_file;
-  std::cout << "Loading [" << map_file << "]" << std::endl;
 
   const auto& plan_robot = scenario.robots.find(scenario.plan.robot);
   if (plan_robot == scenario.robots.end())
@@ -75,20 +70,10 @@ int main(int argc, char* argv[])
     return 0;
   }
 
-  rmf_traffic::agv::Graph graph_0;
-  try
-  {
-    graph_0 = rmf_fleet_adapter::agv::parse_graph(map_file, plan_robot->second);
-  }
-  catch (YAML::BadFile& e)
-  {
-    std::cout << "Failed to load map file [" << map_file << "]" << std::endl;
-    return 0;
-  }
-
-  const auto get_wp = [&](const std::string& name)
+  const auto get_wp =
+    [&](const rmf_traffic::agv::Graph& graph, const std::string& name)
     {
-      return graph_0.find_waypoint(name)->index();
+      return graph.find_waypoint(name)->index();
     };
 
   const auto start_time = std::chrono::steady_clock::now();
@@ -103,40 +88,54 @@ int main(int argc, char* argv[])
   {
     const auto& robot = scenario.robots.find(obstacle.robot);
 
-    rmf_traffic::agv::Planner planner = rmf_traffic::agv::Planner{
-      {graph_0, plan_robot->second},
-      {nullptr}
-    };
     if (robot == scenario.robots.end())
     {
       std::cout << "Robot [" << obstacle.robot <<
         "] is missing traits and profile. Using traits and profile of plan_robot."
                 << std::endl;
+
+      rmf_traffic::agv::Planner planner = rmf_traffic::agv::Planner{
+        plan_robot->second,
+        {nullptr}
+      };
+
+      obstacles.emplace_back(
+        rmf_performance_tests::add_obstacle(
+          planner, database,
+          {
+            start_time + std::chrono::seconds(obstacle.initial_time),
+            get_wp(plan_robot->second.graph(), obstacle.initial_waypoint),
+            obstacle.initial_orientation * M_PI / 180.0
+          },
+          get_wp(plan_robot->second.graph(), obstacle.goal)
+        )
+      );
     }
     else
     {
-      planner = rmf_traffic::agv::Planner{
-        {graph_0, robot->second},
+      rmf_traffic::agv::Planner planner = rmf_traffic::agv::Planner{
+        robot->second,
         {nullptr}
       };
-    }
 
-    obstacles.emplace_back(
-      rmf_performance_tests::add_obstacle(
-        planner, database,
-        {
-          start_time + std::chrono::seconds(obstacle.initial_time),
-          get_wp(obstacle.initial_waypoint),
-          obstacle.initial_orientation * M_PI / 180.0
-        },
-        get_wp(obstacle.goal)
-      )
-    );
+      obstacles.emplace_back(
+        rmf_performance_tests::add_obstacle(
+          planner, database,
+          {
+            start_time + std::chrono::seconds(obstacle.initial_time),
+            get_wp(robot->second.graph(), obstacle.initial_waypoint),
+            obstacle.initial_orientation * M_PI / 180.0
+          },
+          get_wp(robot->second.graph(), obstacle.goal)
+        )
+      );
+    }
   }
 
   const auto& plan = scenario.plan;
 
-  rmf_planner_viz::draw::Graph graph_0_drawable(graph_0, 1.0, font);
+  rmf_planner_viz::draw::Graph graph_0_drawable(
+    plan_robot->second.graph(), 1.0, font);
   std::vector<std::string> map_names = graph_0_drawable.get_map_names();
   std::string chosen_map;
   if (graph_0_drawable.current_map())
@@ -144,10 +143,10 @@ int main(int argc, char* argv[])
 
   const auto obstacle_validator =
     rmf_traffic::agv::ScheduleRouteValidator::make(
-    database, NotObstacleID, plan_robot->second.profile());
+    database, NotObstacleID, plan_robot->second.vehicle_traits().profile());
 
   rmf_traffic::agv::Planner planner_0(
-    rmf_traffic::agv::Planner::Configuration(graph_0, plan_robot->second),
+    plan_robot->second,
     rmf_traffic::agv::Planner::Options(obstacle_validator));
 
   /// Setup participants
@@ -157,16 +156,18 @@ int main(int argc, char* argv[])
 
   std::vector<rmf_traffic::agv::Planner::Start> starts;
   starts.emplace_back(start_time + std::chrono::seconds(
-      plan.initial_time), get_wp(plan.initial_waypoint),
+      plan.initial_time),
+    get_wp(plan_robot->second.graph(), plan.initial_waypoint),
     plan.initial_orientation);
 
-  rmf_traffic::agv::Planner::Goal goal(get_wp(plan.goal));
+  rmf_traffic::agv::Planner::Goal goal(get_wp(
+      plan_robot->second.graph(), plan.goal));
   rmf_traffic::agv::Planner::Debug planner_debug(planner_0);
   rmf_traffic::agv::Planner::Debug::Progress progress =
     planner_debug.begin(starts, goal, planner_0.get_default_options());
 
   rmf_planner_viz::draw::Schedule schedule_drawable(
-    database, 0.25, scenario.map_file, start_time + std::chrono::seconds(
+    database, 0.25, "", start_time + std::chrono::seconds(
       plan.initial_time));
 
   rmf_planner_viz::draw::Fit fit(
@@ -281,9 +282,9 @@ int main(int argc, char* argv[])
     force_replan |= startgoal_force_replan;
 
     rmf_planner_viz::draw::do_planner_debug(
-      plan_robot->second.profile(), chosen_map,
+      plan_robot->second.vehicle_traits().profile(), chosen_map,
       planner_0, starts, goal,
-      graph_0.num_waypoints(), planner_debug, progress, start_time,
+      plan_robot->second.graph().num_waypoints(), planner_debug, progress, start_time,
       force_replan, show_node_trajectories, trajectories_to_render);
 
     ImGui::EndFrame();
