@@ -19,6 +19,7 @@ Then you can start running interactive tests in the `./build/rmf_planner_viz/` d
 Test Programs:
 - simple_test: Visual AStar planner debugger
 - test_trajectory, test_spline: spline testing utilities
+- performance_test: Visualizer for [`rmf_performance_tests`](https://github.com/osrf/rmf_performance_tests)
 
 (Requires fcl 0.6)
 
@@ -42,3 +43,9 @@ To use other nav graphs,
 - Import https://github.com/osrf/rmf_demos and https://github.com/osrf/traffic_editor into your colcon workspace and colcon build it.
 - This will generate the navgraph .yaml files in the build/rmf_demo_maps/maps/<map name>/nav_graphs/*.yaml
 - Run `./build/simple_test ./build/rmf_demo_maps/maps/<map name>/nav_graphs/*.yaml` to load the nav graph
+
+To run the performance tests:
+```asm
+cd {ros2_ws}
+./src/rmf/rmf_planner_viz/build/performance_test {SCENARIO_NAME}
+```
