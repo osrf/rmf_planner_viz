@@ -35,9 +35,11 @@
 #include <fcl/math/motion/spline_motion.h>
 #include <fcl/geometry/bvh/BVH_internal.h>
 #include <fcl/geometry/geometric_shape_to_BVH_model.h>
+#include <fcl/geometry/shape/capsule.h>
 
 #include "imgui-SFML.h"
 #include "test_sidecar_utils.hpp"
+#include "spline_offset_utils.hpp"
 
 void draw_fcl_motion(fcl::MotionBase<double>* motion, const sf::Color& color = sf::Color(255, 255, 255, 255))
 {
@@ -150,6 +152,7 @@ int main()
   shape_b2_offset.setIdentity();
   
   auto shape_b_bvh = std::make_shared<fcl::BVHModel<fcl::OBBRSSd>>();
+  auto shape_b_capsule = std::make_shared<fcl::Capsuled>(0.6f, 99.0f);
   auto box_to_triangle_vertices = [](const fcl::Boxd& box, const fcl::Transform3d& pose, std::vector<fcl::Vector3d>& vertices_out, 
     std::vector<fcl::Triangle>& triangles_out)
   {
@@ -171,6 +174,7 @@ int main()
   };
   
   // add shape
+#if 0
   {
 #if 1 //this block doesnt detect a collision
     shape_b_bvh->beginModel();
@@ -197,6 +201,7 @@ int main()
     int res = fcl::generateBVHModel(*shape_b_bvh, shape_b, ident, fcl::FinalizeModel::DO);
 #endif
   }
+#endif
 
   // interp motion parameters
   Eigen::Vector3d a_start(0,0,0), a_end(0,0,0);
@@ -244,19 +249,31 @@ int main()
         b_shapes.emplace_back(identity, 0.5);
 
         shape_b2_offset.setIdentity();
-        shape_b2_offset.pretranslate(Eigen::Vector3d(0, -1.0, 0));
+        //shape_b2_offset.pretranslate(Eigen::Vector3d(0, -1.0, 0));
+        shape_b2_offset.pretranslate(Eigen::Vector3d(0, -0.5, 0));
+        b_shapes.emplace_back(shape_b2_offset, 0.6);
+
+        shape_b2_offset.setIdentity();
+        shape_b2_offset.pretranslate(Eigen::Vector3d(0, 0.5, 0));
         b_shapes.emplace_back(shape_b2_offset, 0.6);
 
         fcl::Transform3<double> b_start;
         b_start.setIdentity();
-        b_start.translation() = fcl::Vector3d(-2, 0, 0);
+        b_start.translation() = fcl::Vector3d(-2, -1.5, 0);
 
         fcl::Transform3<double> b_end;
         b_end.setIdentity();
-        b_end.translation() = fcl::Vector3d(0, 0, 0);
+        b_end.translation() = fcl::Vector3d(0, -1.5, 0);
 
-        motion_a = std::make_shared<fcl::InterpMotion<double>>(identity, identity);
-        motion_b = std::make_shared<fcl::InterpMotion<double>>(b_start, b_end);
+        Eigen::Vector3d zero(0,0,0), b_startv(-2, 1.5, 0), b_endv(0, 1.5, 0);
+        auto knots_a =
+          rmf_planner_viz::draw::compute_knots(zero, zero, zero, zero);
+        auto knots_b =
+          rmf_planner_viz::draw::compute_knots(b_startv, b_endv, zero, zero);
+
+
+        motion_a = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_a));
+        motion_b = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_b));
       }
       
       ImGui::Separator();
@@ -279,11 +296,13 @@ int main()
       // collision
       {
         const auto obj_a = fcl::ContinuousCollisionObject<double>(shape_a, motion_a);
-        const auto obj_b = fcl::ContinuousCollisionObject<double>(shape_b_bvh, motion_b);
+        //const auto obj_b = fcl::ContinuousCollisionObject<double>(shape_b_bvh, motion_b);
+        const auto obj_b = fcl::ContinuousCollisionObject<double>(shape_b_capsule, motion_b);
         
-        fcl::ContinuousCollisionRequest<double> request;
+        fcl::ContinuousCollisionRequestd request;
         request.ccd_solver_type = fcl::CCDC_CONSERVATIVE_ADVANCEMENT;
         request.gjk_solver_type = fcl::GST_LIBCCD;
+        request.toc_err = 0.01;
 
         // test for collision
         fcl::ContinuousCollisionResultd result;

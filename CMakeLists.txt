@@ -125,6 +125,8 @@ if(fcl_FOUND)
 
   add_executable(test_fcl_bvh
     test/test_fcl_bvh.cpp
+    test/spline_offset_utils.cpp
+    test/test_sidecar_utils.cpp
   )
 
   target_link_libraries(test_fcl_bvh
