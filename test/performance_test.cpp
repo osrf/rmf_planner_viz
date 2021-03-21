@@ -25,6 +25,7 @@
 #include <rmf_planner_viz/draw/IMDraw.hpp>
 #include <rmf_planner_viz/draw/Trajectory.hpp>
 
+#include <rmf_performance_tests/Scenario.hpp>
 #include <rmf_performance_tests/rmf_performance_tests.hpp>
 
 #include "imgui-SFML.h"
@@ -49,10 +50,10 @@ int main(int argc, char* argv[])
     return 0;
   }
 
-  rmf_performance_tests::scenario::Scenario scenario;
+  rmf_performance_tests::scenario::Description scenario;
   try
   {
-    parse_scenario(argv[1], scenario);
+    parse(argv[1], scenario);
   }
   catch (std::runtime_error& e)
   {
@@ -175,7 +176,7 @@ int main(int argc, char* argv[])
 
   sf::RenderWindow app_window(
     sf::VideoMode(1250, 1028),
-    "Simple Test",
+    "Performance Test",
     sf::Style::Default);
 
   app_window.resetGLStates();
