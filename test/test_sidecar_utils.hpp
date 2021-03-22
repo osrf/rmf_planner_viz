@@ -23,6 +23,7 @@
 
 #include <Eigen/Dense>
 #include <fcl/math/motion/spline_motion.h>
+#include <fcl/geometry/shape/shape_base.h>
 #include <rmf_planner_viz/draw/IMDraw.hpp>
 #include <float.h>
 
@@ -33,11 +34,12 @@ namespace draw {
 
 struct ModelSpaceShape
 {
-  ModelSpaceShape(const fcl::Transform3d& tx, double r)
-    :_transform(tx), _radius(r)
+  ModelSpaceShape(const fcl::Transform3d& tx, std::shared_ptr<fcl::ShapeBase<double>> s)
+    :_transform(tx), shape(s)
   { }
   fcl::Transform3d _transform;
-  double _radius;
+  
+  std::shared_ptr<fcl::ShapeBase<double>> shape;
 };
 
 // this uses spline motions

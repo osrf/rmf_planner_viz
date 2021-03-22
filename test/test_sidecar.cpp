@@ -125,8 +125,18 @@ void draw_robot_on_spline(fcl::MotionBase<double>* motion, double interp,
   {
     auto tx = tf * shapes[i]._transform;
     auto pt = tx.translation();
-    rmf_planner_viz::draw::IMDraw::draw_circle(sf::Vector2f(pt.x(), pt.y()), 
-      shapes[i]._radius, color);
+    if (shapes[i].shape)
+    {
+      if (shapes[i].shape->getNodeType() == fcl::GEOM_SPHERE)
+      {
+        auto sphere_a =
+          std::dynamic_pointer_cast<fcl::Sphered>(shapes[i].shape);
+        rmf_planner_viz::draw::IMDraw::draw_circle(sf::Vector2f(pt.x(), pt.y()), 
+          sphere_a->radius, color);
+      }
+      else if (shapes[i].shape->getNodeType() == fcl::GEOM_BOX)
+        ;
+    }
     
     if (i == 0)
     {
@@ -345,11 +355,8 @@ int main()
       {
         auto& preset = presets[current_preset];
 
-        auto shape_a = std::make_shared<fcl::Sphered>(preset.a_shapes[0]._radius);
-        auto shape_b = std::make_shared<fcl::Sphered>(preset.b_shapes[0]._radius);
-        
-        const auto obj_a = fcl::ContinuousCollisionObjectd(shape_a, motion_a);
-        const auto obj_b = fcl::ContinuousCollisionObjectd(shape_b, motion_b);
+        const auto obj_a = fcl::ContinuousCollisionObjectd(preset.a_shapes[0].shape, motion_a);
+        const auto obj_b = fcl::ContinuousCollisionObjectd(preset.b_shapes[0].shape, motion_b);
 
         fcl::ContinuousCollisionRequestd request;
         request.ccd_solver_type = fcl::CCDC_CONSERVATIVE_ADVANCEMENT;

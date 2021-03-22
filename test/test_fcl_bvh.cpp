@@ -81,8 +81,14 @@ void draw_robot_on_spline(fcl::MotionBase<double>* motion, double interp,
   {
     auto tx = tf * shapes[i]._transform;
     auto pt = tx.translation();
-    rmf_planner_viz::draw::IMDraw::draw_circle(sf::Vector2f(pt.x(), pt.y()), 
-      shapes[i]._radius, color);
+    
+    if (shapes[i].shape->getNodeType() == fcl::GEOM_SPHERE)
+    {
+      auto sphere_a =
+          std::dynamic_pointer_cast<fcl::Sphered>(shapes[i].shape);
+      rmf_planner_viz::draw::IMDraw::draw_circle(sf::Vector2f(pt.x(), pt.y()), 
+        sphere_a->radius, color);
+    }
     
     if (i == 0)
     {
@@ -240,12 +246,12 @@ int main()
       std::vector<ModelSpaceShape> b_shapes;
 
       {
-        a_shapes.emplace_back(identity, 0.5);
-        b_shapes.emplace_back(identity, 0.5);
+        a_shapes.emplace_back(identity, std::make_shared<fcl::Sphered>(0.5));
+        b_shapes.emplace_back(identity, std::make_shared<fcl::Sphered>(0.5));
 
         shape_b2_offset.setIdentity();
         shape_b2_offset.pretranslate(Eigen::Vector3d(0, -1.0, 0));
-        b_shapes.emplace_back(shape_b2_offset, 0.6);
+        b_shapes.emplace_back(shape_b2_offset, std::make_shared<fcl::Sphered>(0.6));
 
         fcl::Transform3<double> b_start;
         b_start.setIdentity();
