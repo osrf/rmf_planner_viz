@@ -231,6 +231,42 @@ void IMDraw::draw_aabb(const sf::Vector2f& box_min, const sf::Vector2f& box_max,
   g_vertexarrays.push_back(vtx_arr);
 }
 
+void IMDraw::draw_box(const sf::Vector2f& center,
+    const sf::Vector2f& box_x, const sf::Vector2f& box_y, 
+    const sf::Color& color)
+{
+  sf::VertexArray vtx_arr(sf::Lines);
+
+  sf::Vertex v;
+  v.color = color;
+
+  v.position = center - box_x - box_y;
+  vtx_arr.append(v);
+
+  v.position = center + box_x - box_y;
+  vtx_arr.append(v);
+
+  v.position = center + box_x - box_y;
+  vtx_arr.append(v);
+
+  v.position = center + box_x + box_y;
+  vtx_arr.append(v);
+
+  v.position = center + box_x + box_y;
+  vtx_arr.append(v);
+
+  v.position = center - box_x + box_y;
+  vtx_arr.append(v);
+
+  v.position = center - box_x + box_y;
+  vtx_arr.append(v);
+
+  v.position = center - box_x - box_y;
+  vtx_arr.append(v);
+
+  g_vertexarrays.push_back(vtx_arr);
+}
+
 void IMDraw::flush_and_render(sf::RenderWindow& app_window, const sf::Transform& tx_flipped_2d)
 {
   for (auto& single_array : g_vertexarrays)

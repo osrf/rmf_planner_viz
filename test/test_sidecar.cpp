@@ -129,13 +129,26 @@ void draw_robot_on_spline(fcl::MotionBase<double>* motion, double interp,
     {
       if (shapes[i].shape->getNodeType() == fcl::GEOM_SPHERE)
       {
-        auto sphere_a =
+        auto sphere =
           std::dynamic_pointer_cast<fcl::Sphered>(shapes[i].shape);
         rmf_planner_viz::draw::IMDraw::draw_circle(sf::Vector2f(pt.x(), pt.y()), 
-          sphere_a->radius, color);
+          sphere->radius, color);
       }
       else if (shapes[i].shape->getNodeType() == fcl::GEOM_BOX)
-        ;
+      {
+        auto col0 = tx.linear().col(0);
+        auto col1 = tx.linear().col(1);
+        
+        auto box =
+          std::dynamic_pointer_cast<fcl::Boxd>(shapes[i].shape);
+        rmf_planner_viz::draw::IMDraw::draw_box(sf::Vector2f(pt.x(), pt.y()),
+          sf::Vector2f(col0.x() * box->side.x() * 0.5, col0.y() * box->side.x() * 0.5), 
+          sf::Vector2f(col1.x() * box->side.y() * 0.5, col1.y() * box->side.y() * 0.5), 
+          color);
+
+        auto p = tx.translation() + col0 * box->side.x() * 0.5 + col1 * box->side.y() * 0.5;
+        rmf_planner_viz::draw::IMDraw::draw_circle(sf::Vector2f(p.x(), p.y()), 0.125, color);
+      }
     }
     
     if (i == 0)

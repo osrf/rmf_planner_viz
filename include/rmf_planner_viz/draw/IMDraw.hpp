@@ -48,6 +48,10 @@ public:
 
   static void draw_aabb(const sf::Vector2f& box_min, const sf::Vector2f& box_max, const sf::Color& color = sf::Color(255, 255, 255, 255));
 
+  static void draw_box(const sf::Vector2f& center,
+    const sf::Vector2f& box_x, const sf::Vector2f& box_y, 
+    const sf::Color& color = sf::Color(255, 255, 255, 255));
+
   // render all objects and flush the internal vertex array buffer
   static void flush_and_render(sf::RenderWindow& app_window, const sf::Transform& tx_flipped_2d);
 };
