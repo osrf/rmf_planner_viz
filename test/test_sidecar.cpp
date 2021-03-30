@@ -146,8 +146,8 @@ void draw_robot_on_spline(fcl::MotionBase<double>* motion, double interp,
           sf::Vector2f(col1.x() * box->side.y() * 0.5, col1.y() * box->side.y() * 0.5), 
           color);
 
-        auto p = tx.translation() + col0 * box->side.x() * 0.5 + col1 * box->side.y() * 0.5;
-        rmf_planner_viz::draw::IMDraw::draw_circle(sf::Vector2f(p.x(), p.y()), 0.125, color);
+        // auto p = tx.translation() + col0 * box->side.x() * 0.5 + col1 * box->side.y() * 0.5;
+        // rmf_planner_viz::draw::IMDraw::draw_circle(sf::Vector2f(p.x(), p.y()), 0.125, color);
       }
     }
     

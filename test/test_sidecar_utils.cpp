@@ -31,6 +31,7 @@
 #include <fcl/narrowphase/detail/primitive_shape_algorithm/box_box.h>
 
 //#define DO_LOGGING 1
+#define CLOSEST_FEATURES 1
 
 namespace rmf_planner_viz {
 namespace draw {
@@ -43,6 +44,20 @@ static double seperation_sphere_box(
       const Eigen::Vector3d& vec_normalized,
       const Eigen::Vector3d& reference_pt)
 {
+#ifdef CLOSEST_FEATURES
+  Eigen::Vector3d a(0,0,0), b(0,0,0);
+  double dist = 0.0;
+  bool seperated = fcl::detail::sphereBoxDistance(sphere, tx_sphere, box, tx_box,
+    &dist, &a, &b);
+  if (seperated)
+  {
+    auto v = b - a;
+    double dist_between_shapes_along_d = v.dot(vec_normalized);
+    //printf("dist_between_shapes_along_d: %g\n", dist_between_shapes_along_d);
+    return dist_between_shapes_along_d;
+  }
+  return dist;
+#else
   double projected_sphere = vec_normalized.dot(tx_sphere.translation() - reference_pt);
   double projected_box = vec_normalized.dot(tx_box.translation() - reference_pt);
   
@@ -60,6 +75,275 @@ static double seperation_sphere_box(
   double l = std::max(l0, l1);
   //printf("abs(%g - %g)=%g\n", projected_sphere, projected_box, abs(projected_sphere - projected_box));
   return abs(projected_sphere - projected_box) - (sphere.radius + l);
+#endif
+}
+
+Eigen::Vector3d closestpt_on_lineseg_to_pt(
+  const Eigen::Vector3d& ls_start, const Eigen::Vector3d& ls_end,
+  const Eigen::Vector3d& p, double& dist)
+{
+  auto ls_vec = ls_end - ls_start;
+  double len = ls_vec.norm();
+  auto ls_vec_norm = ls_vec / len;
+  auto ls_start_to_p = p - ls_start;
+  
+  double l = ls_vec_norm.dot(ls_start_to_p);
+  if (l < 0.0)
+    l = 0.0;
+  if (l > len)
+    l = len;
+  
+  auto closest_pt = ls_start + l * ls_vec_norm;
+  //rmf_planner_viz::draw::IMDraw::draw_circle(sf::Vector2f(closest_pt.x(), closest_pt.y()), 0.115, sf::Color(255, 255, 0, 255));
+  dist = (closest_pt - p).norm();
+  return closest_pt;
+}
+
+double box_box_closest_pts(
+      const fcl::Boxd& box_a,
+      const fcl::Transform3d& tx_a,
+      const fcl::Boxd& box_b,
+      const fcl::Transform3d& tx_b,
+      Eigen::Vector3d& a, Eigen::Vector3d& b)
+{
+  double halfsize_x_a = box_a.side.x() * 0.5;
+  double halfsize_y_a = box_a.side.y() * 0.5;
+  double halfsize_x_b = box_b.side.x() * 0.5;
+  double halfsize_y_b = box_b.side.y() * 0.5;
+
+  auto linear_a = tx_a.linear();
+  auto col0_a = linear_a.col(0);
+  auto col1_a = linear_a.col(1);
+
+  auto linear_b = tx_b.linear();
+  auto col0_b = linear_b.col(0);
+  auto col1_b = linear_b.col(1);
+
+  auto center_a = tx_a.translation();
+  auto center_b = tx_b.translation();
+
+  // form points of box a and b
+  Eigen::Vector3d pts_a[4];
+  pts_a[0] = center_a + col0_a * halfsize_x_a + col1_a * halfsize_y_a;
+  pts_a[1] = center_a - col0_a * halfsize_x_a + col1_a * halfsize_y_a;
+  pts_a[2] = center_a - col0_a * halfsize_x_a - col1_a * halfsize_y_a;
+  pts_a[3] = center_a + col0_a * halfsize_x_a - col1_a * halfsize_y_a;
+
+  Eigen::Vector3d pts_b[4];
+  pts_b[0] = center_b + col0_b * halfsize_x_b + col1_b * halfsize_y_b;
+  pts_b[1] = center_b - col0_b * halfsize_x_b + col1_b * halfsize_y_b;
+  pts_b[2] = center_b - col0_b * halfsize_x_b - col1_b * halfsize_y_b;
+  pts_b[3] = center_b + col0_b * halfsize_x_b - col1_b * halfsize_y_b;
+
+  auto closest_box_pt_along_projection_outside_box = [](
+    Eigen::Vector3d (&pts)[4], const Eigen::Vector3d& center, double halfside, 
+    const Eigen::Vector3d& proj,
+    Eigen::Vector3d& closest, bool& pts_on_positive_side)
+      -> bool
+  {
+    double dotp[4] = { 0.0, 0.0, 0.0, 0.0 };
+    dotp[0] = proj.dot(pts[0] - center);
+    dotp[1] = proj.dot(pts[1] - center);
+    dotp[2] = proj.dot(pts[2] - center);
+    dotp[3] = proj.dot(pts[3] - center);
+
+    uint negative_points = 0, positive_points = 0;
+    int negative_point_gap_idx = -1, positive_point_gap_idx = -1;
+    double negative_point_gap = DBL_MAX, positive_point_gap = DBL_MAX;
+    for (int i=0; i<4; ++i)
+    {
+      //printf ("dotp %d: %f\n", i, dotp[i]);
+      if (dotp[i] > halfside)
+      {
+        ++positive_points;
+        double gap = dotp[i] - halfside;
+        if (gap < positive_point_gap)
+        {
+          positive_point_gap_idx = i;
+          positive_point_gap = gap;
+        }
+      }
+      if (dotp[i] < -halfside)
+      {
+        ++negative_points;
+        double gap = -halfside - dotp[i];
+        if (gap < negative_point_gap)
+        {
+          negative_point_gap_idx = i;
+          negative_point_gap = gap;
+        }
+      }
+    }
+
+    //printf("+count: %d -count: %d\n", positive_points, negative_points);
+    if (!(positive_points == 4 || negative_points == 4))
+    {
+      //printf("fail\n");
+      return false;
+    }
+
+    uint chosen_id = 0;
+    if (positive_points == 4) // all points on +ve col_a side
+    {
+      pts_on_positive_side = true;
+      chosen_id = positive_point_gap_idx;
+    }
+    else if (negative_points == 4) // all points on -ve side
+    {
+      pts_on_positive_side = false;
+      chosen_id = negative_point_gap_idx;
+    }
+
+    // check for tiebreak
+    uint next_id = (chosen_id + 1) % 4;
+    uint prev_id = chosen_id == 0 ? 3 : chosen_id - 1;
+    bool tiebreak = false;
+    Eigen::Vector3d other_pt;
+    if (dotp[next_id] == dotp[chosen_id])
+    {
+      tiebreak = true;
+      other_pt = pts[next_id];
+    }
+    if (dotp[prev_id] == dotp[chosen_id])
+    {
+      tiebreak = true;
+      other_pt = pts[prev_id];
+    }
+
+    if (tiebreak)
+    {
+      Eigen::Vector3d projection_perp(-proj.y(), proj.x(), 0);
+      double dotp_c0 = projection_perp.dot(pts[chosen_id] - center);
+      double dotp_c1 = projection_perp.dot(other_pt - center);
+      if (abs(dotp_c0) < abs(dotp_c1))
+      {
+        printf("a\n");
+        closest = pts[chosen_id];
+      }
+      else
+      {
+        printf("b\n");
+        closest = other_pt;
+      }
+    }
+    else
+    {
+      printf ("no tiebreak!\n");
+      closest = pts[chosen_id];
+    }
+
+    return true;
+  };
+
+  Eigen::Vector3d closest(0,0,0);
+  bool positive_side = false;
+  // test with box b points using box a projections
+  if (closest_box_pt_along_projection_outside_box(
+      pts_b, center_a, halfsize_x_a, col0_a, closest, positive_side))
+  {
+    std::cout << "HERE A\n";
+    if (positive_side)
+    {
+      double dist = 0.0;
+      auto closest_pt = closestpt_on_lineseg_to_pt(
+        pts_a[0], pts_a[3], closest, dist);
+      
+      b = closest;
+      a = closest_pt;
+      return dist;
+    }
+    else
+    {
+      double dist = 0.0;
+      auto closest_pt = closestpt_on_lineseg_to_pt(
+        pts_a[1], pts_a[2], closest, dist);
+
+      // rmf_planner_viz::draw::IMDraw::draw_circle(sf::Vector2f(pts_a[1].x(), pts_a[1].y()), 0.115, sf::Color(255, 255, 0, 255));
+      // rmf_planner_viz::draw::IMDraw::draw_circle(sf::Vector2f(pts_a[2].x(), pts_a[2].y()), 0.115, sf::Color(255, 255, 0, 255));
+      b = closest;
+      a = closest_pt;
+      //rmf_planner_viz::draw::IMDraw::draw_circle(sf::Vector2f(a.x(), a.y()), 0.115, sf::Color(255, 255, 0, 255));
+      //rmf_planner_viz::draw::IMDraw::draw_circle(sf::Vector2f(b.x(), b.y()), 0.115, sf::Color(255, 255, 0, 255));
+
+      return dist;
+    }
+  }
+
+  if (closest_box_pt_along_projection_outside_box(
+      pts_b, center_a, halfsize_y_a, col1_a, closest, positive_side))
+  {
+    std::cout << "HERE B\n";
+    if (positive_side)
+    {
+      std::cout << "HERE Ba\n";
+      double dist = 0.0;
+      auto closest_pt = closestpt_on_lineseg_to_pt(
+        pts_a[0], pts_a[1], closest, dist);
+      b = closest;
+      a = closest_pt;
+      return dist;
+    }
+    else
+    {
+      std::cout << "HERE Bb\n";
+      double dist = 0.0;
+      auto closest_pt = closestpt_on_lineseg_to_pt(
+        pts_a[2], pts_a[3], closest, dist);
+      b = closest;
+      a = closest_pt;
+      return dist;
+    }
+  }
+
+  // test with box a points using box b projections
+  if (closest_box_pt_along_projection_outside_box(
+      pts_a, center_b, halfsize_x_b, col0_b, closest, positive_side))
+  {
+    std::cout << "HERE C\n";
+    if (positive_side)
+    {
+      double dist = 0.0;
+      auto closest_pt = closestpt_on_lineseg_to_pt(
+        pts_b[0], pts_b[3], closest, dist);
+      b = closest;
+      a = closest_pt;
+      return dist;
+    }
+    else
+    {
+      double dist = 0.0;
+      auto closest_pt = closestpt_on_lineseg_to_pt(
+        pts_b[1], pts_b[2], closest, dist);
+      b = closest;
+      a = closest_pt;
+      return dist;
+    }
+  }
+
+  if (closest_box_pt_along_projection_outside_box(
+      pts_a, center_b, halfsize_y_b, col1_b, closest, positive_side))
+  {
+    std::cout << "HERE D\n";
+    if (positive_side)
+    {
+      double dist = 0.0;
+      auto closest_pt = closestpt_on_lineseg_to_pt(
+        pts_b[0], pts_b[1], closest, dist);
+      b = closest;
+      a = closest_pt;
+      return dist;
+    }
+    else
+    {
+      double dist = 0.0;
+      auto closest_pt = closestpt_on_lineseg_to_pt(
+        pts_b[2], pts_b[3], closest, dist);
+      b = closest;
+      a = closest_pt;
+      return dist;
+    }
+  }
+  return -1.0;
 }
 
 static double compute_seperation_between_shapes_along_vector(
@@ -79,7 +363,7 @@ static double compute_seperation_between_shapes_along_vector(
       std::dynamic_pointer_cast<fcl::Sphered>(shape_b);
 
     //and project, slower than 
-#if 0
+#ifdef CLOSEST_FEATURES
     Eigen::Vector3d b_to_a = tx_a.translation() - tx_b.translation();
     double b_to_a_dist = b_to_a.norm();
     if (b_to_a_dist > 1e-04)
@@ -90,12 +374,13 @@ static double compute_seperation_between_shapes_along_vector(
       double dist_between_shapes_along_d = v.dot(vec_normalized);
       return dist_between_shapes_along_d;
     }
-#endif
+#else
     //project onto vec_normalized, use the difference. 
     //faster by 50%, but requires a higher tolerance value
     double projected_a = vec_normalized.dot(tx_a.translation() - reference_pt);
     double projected_b = vec_normalized.dot(tx_b.translation() - reference_pt);
     return abs(projected_a - projected_b) - (sphere_a->radius + sphere_b->radius);
+#endif
   }
   else if (shape_a->getNodeType() == fcl::GEOM_SPHERE && 
     shape_b->getNodeType() == fcl::GEOM_BOX)
@@ -119,6 +404,26 @@ static double compute_seperation_between_shapes_along_vector(
     return seperation_sphere_box(*sphere_b, tx_b, *box_a, tx_a,
       vec_normalized, reference_pt);
   }
+  else if (shape_a->getNodeType() == fcl::GEOM_BOX && 
+    shape_b->getNodeType() == fcl::GEOM_BOX)
+  {
+    auto box_a =
+      std::dynamic_pointer_cast<fcl::Boxd>(shape_a);
+    auto box_b =
+      std::dynamic_pointer_cast<fcl::Boxd>(shape_b);
+    printf("seperation\n");
+    // std::cout << *box_a << std::endl;
+    // std::cout << *box_b << std::endl;
+    // std::cout << tx_a.translation() << std::endl;
+    // std::cout << tx_b.translation() << std::endl;
+
+    Eigen::Vector3d a(0, 0, 0), b(0, 0, 0);
+    double dist = box_box_closest_pts(*box_a, tx_a, *box_b, tx_b, a, b);
+    printf("dist: %f\n", dist);
+    auto v = a - b;
+    double dist_between_shapes_along_d = v.dot(vec_normalized);
+    return dist_between_shapes_along_d;
+  }
 
   return 0.0;
 }
@@ -134,9 +439,9 @@ static double compute_dist_between_shapes(
   if (shape_a->getNodeType() == fcl::GEOM_SPHERE && 
     shape_b->getNodeType() == fcl::GEOM_SPHERE)
   {
-    std::shared_ptr<fcl::Sphered> sphere_a =
+    auto sphere_a =
       std::dynamic_pointer_cast<fcl::Sphered>(shape_a);
-    std::shared_ptr<fcl::Sphered> sphere_b =
+    auto sphere_b =
       std::dynamic_pointer_cast<fcl::Sphered>(shape_b);
 
     double dist = 0.0;
@@ -150,9 +455,9 @@ static double compute_dist_between_shapes(
   else if (shape_a->getNodeType() == fcl::GEOM_SPHERE && 
     shape_b->getNodeType() == fcl::GEOM_BOX)
   {
-    std::shared_ptr<fcl::Sphered> sphere_a =
+    auto sphere_a =
       std::dynamic_pointer_cast<fcl::Sphered>(shape_a);
-    std::shared_ptr<fcl::Boxd> box_b =
+    auto box_b =
       std::dynamic_pointer_cast<fcl::Boxd>(shape_b);
 
     double dist = 0.0;
@@ -162,13 +467,28 @@ static double compute_dist_between_shapes(
   else if (shape_a->getNodeType() == fcl::GEOM_BOX && 
     shape_b->getNodeType() == fcl::GEOM_SPHERE)
   {
-    std::shared_ptr<fcl::Boxd> box_a =
+    auto box_a =
       std::dynamic_pointer_cast<fcl::Boxd>(shape_a);
-    std::shared_ptr<fcl::Sphered> sphere_b =
+    auto sphere_b =
       std::dynamic_pointer_cast<fcl::Sphered>(shape_b);
 
     double dist = 0.0;
     fcl::detail::sphereBoxDistance(*sphere_b, tx_b, *box_a, tx_a, &dist, &b, &a);
+    return dist;
+  }
+  else if (shape_a->getNodeType() == fcl::GEOM_BOX && 
+    shape_b->getNodeType() == fcl::GEOM_BOX)
+  {
+    auto box_a =
+      std::dynamic_pointer_cast<fcl::Boxd>(shape_a);
+    auto box_b =
+      std::dynamic_pointer_cast<fcl::Boxd>(shape_b);
+
+    double dist = box_box_closest_pts(*box_a, tx_a, *box_b, tx_b, a, b);
+    //std::cout << "a:\n" << a << std::endl;
+    //std::cout << "b:\n" << b << std::endl;
+    rmf_planner_viz::draw::IMDraw::draw_circle(sf::Vector2f(a.x(), a.y()), 0.125, sf::Color(255, 255, 255, 255));
+    rmf_planner_viz::draw::IMDraw::draw_circle(sf::Vector2f(b.x(), b.y()), 0.125, sf::Color(255, 255, 255, 255));
     return dist;
   }
 
@@ -349,6 +669,7 @@ bool collide_seperable_circles(
     printf("======= iter:%d\n", iter);
     std::cout << "d_norm: \n" << d_normalized << std::endl;
     std::cout << "dist_along_d_to_cover: " << dist_along_d_to_cover << std::endl;
+    rmf_planner_viz::draw::IMDraw::draw_arrow(sf::Vector2f(0, 0), sf::Vector2f(d_normalized.x(), d_normalized.y()));
 #endif
 
     t = max_splinemotion_advancement(t, motion_a, motion_b, a_shapes, b_shapes, 
@@ -368,14 +689,14 @@ bool collide_seperable_circles(
       d, reference_pt, next_dist_to_cover);
 
     /*if (next_dist_to_cover <= tolerance)
-      break;
-    if (next_dist_to_cover > dist_along_d_to_cover)
+      break;*/
+    /*if (next_dist_to_cover > dist_along_d_to_cover)
       return false;*/
     dist_along_d_to_cover = next_dist_to_cover;
     //printf("dist_along_d_to_cover: %g\n", dist_along_d_to_cover);
     ++dist_checks;
     ++iter;
-
+    
     //infinite loop prevention. you should increase safety_maximum_checks if you still want a solution
     if (dist_checks > safety_maximum_checks)
       break;
@@ -425,17 +746,18 @@ std::vector<Preset> setup_presets()
     p._type = PRESET_SPLINEMOTION;
 
     p.a_shapes.emplace_back(identity, std::make_shared<fcl::Boxd>(1.5, 1.5, 0));
-    //p.b_shapes.emplace_back(identity, std::make_shared<fcl::Boxd>(0.5, 0.5, 0));
+    //p.b_shapes.emplace_back(identity, std::make_shared<fcl::Boxd>(1.0, 1.0, 0));
     //p.a_shapes.emplace_back(identity, std::make_shared<fcl::Sphered>(0.5));
-    p.b_shapes.emplace_back(identity, std::make_shared<fcl::Sphered>(0.5));
+    //p.b_shapes.emplace_back(identity, std::make_shared<fcl::Sphered>(0.5));
 
     fcl::Transform3<double> shape_b2_offset;
     shape_b2_offset.setIdentity();
     shape_b2_offset.pretranslate(Eigen::Vector3d(0, -1.0, 0));
     p.b_shapes.emplace_back(shape_b2_offset, std::make_shared<fcl::Sphered>(0.6));
+    //p.b_shapes.emplace_back(shape_b2_offset, std::make_shared<fcl::Boxd>(1.2, 1.2, 0));
     
-    p.b_start = Eigen::Vector3d(-3, 2, 0);
-    p.b_end = Eigen::Vector3d(0, 2, 0);
+    p.b_start = Eigen::Vector3d(-3, 1, 0);
+    p.b_end = Eigen::Vector3d(0, 1, 0);
     presets.push_back(p);
   }
 
