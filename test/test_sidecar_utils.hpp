@@ -43,13 +43,13 @@ struct ModelSpaceShape
 };
 
 // this uses spline motions
-bool collide_seperable_circles(
+bool collide_seperable_shapes(
   fcl::SplineMotion<double>& motion_a, 
   fcl::SplineMotion<double>& motion_b,
   const std::vector<ModelSpaceShape>& a_shapes,
   const std::vector<ModelSpaceShape>& b_shapes,
-  double& impact_time, uint& dist_checks, 
-  uint safety_maximum_checks = 120, double tolerance = 0.001);
+  double& impact_time, uint& iterations, 
+  uint safety_maximum_iterations = 120, double tolerance = 0.001);
 
 fcl::SplineMotion<double> to_fcl(const std::array<Eigen::Vector3d, 4>& knots);
 

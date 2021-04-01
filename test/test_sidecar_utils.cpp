@@ -30,53 +30,10 @@
 #include <fcl/narrowphase/detail/primitive_shape_algorithm/sphere_box.h>
 #include <fcl/narrowphase/detail/primitive_shape_algorithm/box_box.h>
 
-//#define DO_LOGGING 1
-#define CLOSEST_FEATURES 1
+#define DO_LOGGING 1
 
 namespace rmf_planner_viz {
 namespace draw {
-
-static double seperation_sphere_box(
-      const fcl::Sphered& sphere,
-      const fcl::Transform3d& tx_sphere,
-      const fcl::Boxd& box,
-      const fcl::Transform3d& tx_box,
-      const Eigen::Vector3d& vec_normalized,
-      const Eigen::Vector3d& reference_pt)
-{
-#ifdef CLOSEST_FEATURES
-  Eigen::Vector3d a(0,0,0), b(0,0,0);
-  double dist = 0.0;
-  bool seperated = fcl::detail::sphereBoxDistance(sphere, tx_sphere, box, tx_box,
-    &dist, &a, &b);
-  if (seperated)
-  {
-    auto v = b - a;
-    double dist_between_shapes_along_d = v.dot(vec_normalized);
-    //printf("dist_between_shapes_along_d: %g\n", dist_between_shapes_along_d);
-    return dist_between_shapes_along_d;
-  }
-  return dist;
-#else
-  double projected_sphere = vec_normalized.dot(tx_sphere.translation() - reference_pt);
-  double projected_box = vec_normalized.dot(tx_box.translation() - reference_pt);
-  
-  // project the entire box onto vec_normalized    
-  auto linear = tx_box.linear();
-  auto col0 = linear.col(0);
-  auto col1 = linear.col(1);
-  auto halfside = box.side * 0.5;
-
-  auto v0 = col0 * halfside.x() + col1 * halfside.y();
-  auto v1 = col0 * halfside.x() - col1 * halfside.y();
-  
-  double l0 = abs(vec_normalized.dot(v0));
-  double l1 = abs(vec_normalized.dot(v1));
-  double l = std::max(l0, l1);
-  //printf("abs(%g - %g)=%g\n", projected_sphere, projected_box, abs(projected_sphere - projected_box));
-  return abs(projected_sphere - projected_box) - (sphere.radius + l);
-#endif
-}
 
 Eigen::Vector3d closestpt_on_lineseg_to_pt(
   const Eigen::Vector3d& ls_start, const Eigen::Vector3d& ls_end,
@@ -216,15 +173,9 @@ double box_box_closest_pts(
       double dotp_c0 = projection_perp.dot(pts[chosen_id] - center);
       double dotp_c1 = projection_perp.dot(other_pt - center);
       if (abs(dotp_c0) < abs(dotp_c1))
-      {
-        printf("a\n");
         closest = pts[chosen_id];
-      }
       else
-      {
-        printf("b\n");
         closest = other_pt;
-      }
     }
     else
     {
@@ -241,7 +192,6 @@ double box_box_closest_pts(
   if (closest_box_pt_along_projection_outside_box(
       pts_b, center_a, halfsize_x_a, col0_a, closest, positive_side))
   {
-    std::cout << "HERE A\n";
     if (positive_side)
     {
       double dist = 0.0;
@@ -272,10 +222,8 @@ double box_box_closest_pts(
   if (closest_box_pt_along_projection_outside_box(
       pts_b, center_a, halfsize_y_a, col1_a, closest, positive_side))
   {
-    std::cout << "HERE B\n";
     if (positive_side)
     {
-      std::cout << "HERE Ba\n";
       double dist = 0.0;
       auto closest_pt = closestpt_on_lineseg_to_pt(
         pts_a[0], pts_a[1], closest, dist);
@@ -285,7 +233,6 @@ double box_box_closest_pts(
     }
     else
     {
-      std::cout << "HERE Bb\n";
       double dist = 0.0;
       auto closest_pt = closestpt_on_lineseg_to_pt(
         pts_a[2], pts_a[3], closest, dist);
@@ -299,7 +246,6 @@ double box_box_closest_pts(
   if (closest_box_pt_along_projection_outside_box(
       pts_a, center_b, halfsize_x_b, col0_b, closest, positive_side))
   {
-    std::cout << "HERE C\n";
     if (positive_side)
     {
       double dist = 0.0;
@@ -323,7 +269,6 @@ double box_box_closest_pts(
   if (closest_box_pt_along_projection_outside_box(
       pts_a, center_b, halfsize_y_b, col1_b, closest, positive_side))
   {
-    std::cout << "HERE D\n";
     if (positive_side)
     {
       double dist = 0.0;
@@ -346,171 +291,56 @@ double box_box_closest_pts(
   return -1.0;
 }
 
-static double compute_seperation_between_shapes_along_vector(
-  std::shared_ptr<fcl::ShapeBase<double>> shape_a, 
-  const fcl::Transform3d& tx_a,
-  std::shared_ptr<fcl::ShapeBase<double>> shape_b, 
-  const fcl::Transform3d& tx_b,
-  const Eigen::Vector3d& vec_normalized,
-  const Eigen::Vector3d& reference_pt)
+struct SeperationComputation
 {
-  if (shape_a->getNodeType() == fcl::GEOM_SPHERE && 
-    shape_b->getNodeType() == fcl::GEOM_SPHERE)
-  {
-    std::shared_ptr<fcl::Sphered> sphere_a =
-      std::dynamic_pointer_cast<fcl::Sphered>(shape_a);
-    std::shared_ptr<fcl::Sphered> sphere_b =
-      std::dynamic_pointer_cast<fcl::Sphered>(shape_b);
+  int support_vertex_a = -1;
+  int support_vertex_b = -1;
 
-    //and project, slower than 
-#ifdef CLOSEST_FEATURES
-    Eigen::Vector3d b_to_a = tx_a.translation() - tx_b.translation();
-    double b_to_a_dist = b_to_a.norm();
-    if (b_to_a_dist > 1e-04)
+  int count_a = 0;
+  int count_b = 0;
+  Eigen::Vector3d local_points_a[4];
+  Eigen::Vector3d local_points_b[4];
+
+  Eigen::Vector3d seperation_axis;
+
+  SeperationComputation(
+    const Eigen::Vector3d& d_normalized,
+    const ModelSpaceShape& a_shape, const ModelSpaceShape& b_shape)
+    : seperation_axis(d_normalized)
+  {
+    auto update_locals = [](const ModelSpaceShape& shp,
+      int& count, Eigen::Vector3d (&local_points)[4])
     {
-      auto b_to_a_norm = b_to_a / b_to_a_dist;
-      double dist_along_b_to_a = b_to_a_dist - (sphere_a->radius + sphere_b->radius);
-      auto v = dist_along_b_to_a * b_to_a_norm;
-      double dist_between_shapes_along_d = v.dot(vec_normalized);
-      return dist_between_shapes_along_d;
-    }
-#else
-    //project onto vec_normalized, use the difference. 
-    //faster by 50%, but requires a higher tolerance value
-    double projected_a = vec_normalized.dot(tx_a.translation() - reference_pt);
-    double projected_b = vec_normalized.dot(tx_b.translation() - reference_pt);
-    return abs(projected_a - projected_b) - (sphere_a->radius + sphere_b->radius);
-#endif
-  }
-  else if (shape_a->getNodeType() == fcl::GEOM_SPHERE && 
-    shape_b->getNodeType() == fcl::GEOM_BOX)
-  {
-    auto sphere_a =
-      std::dynamic_pointer_cast<fcl::Sphered>(shape_a);
-    auto box_b =
-      std::dynamic_pointer_cast<fcl::Boxd>(shape_b);
+      if (shp.shape->getNodeType() == fcl::GEOM_SPHERE)
+      {
+        count = 1;
+        local_points[0].setZero();
+      }
+      else if (shp.shape->getNodeType() == fcl::GEOM_BOX)
+      {
+        auto box =
+          std::dynamic_pointer_cast<fcl::Boxd>(shp.shape);
+        count = 4;
+        auto halfside = box->side * 0.5;
+        local_points[0] = Eigen::Vector3d(-halfside.x(), -halfside.y(), 0.0);
+        local_points[1] = Eigen::Vector3d( halfside.x(), -halfside.y(), 0.0);
+        local_points[2] = Eigen::Vector3d( halfside.x(),  halfside.y(), 0.0);
+        local_points[3] = Eigen::Vector3d(-halfside.x(),  halfside.y(), 0.0);
 
-    return seperation_sphere_box(*sphere_a, tx_a, *box_b, tx_b,
-      vec_normalized, reference_pt);
-  }
-  else if (shape_a->getNodeType() == fcl::GEOM_BOX && 
-    shape_b->getNodeType() == fcl::GEOM_SPHERE)
-  { 
-    auto box_a =
-      std::dynamic_pointer_cast<fcl::Boxd>(shape_a);
-    auto sphere_b =
-      std::dynamic_pointer_cast<fcl::Sphered>(shape_b);
+        //@attempt: eliminate furthest vertex and use 2 edges?
+      }
+      //@todo: type error
+    };
 
-    return seperation_sphere_box(*sphere_b, tx_b, *box_a, tx_a,
-      vec_normalized, reference_pt);
-  }
-  else if (shape_a->getNodeType() == fcl::GEOM_BOX && 
-    shape_b->getNodeType() == fcl::GEOM_BOX)
-  {
-    auto box_a =
-      std::dynamic_pointer_cast<fcl::Boxd>(shape_a);
-    auto box_b =
-      std::dynamic_pointer_cast<fcl::Boxd>(shape_b);
-    printf("seperation\n");
-    // std::cout << *box_a << std::endl;
-    // std::cout << *box_b << std::endl;
-    // std::cout << tx_a.translation() << std::endl;
-    // std::cout << tx_b.translation() << std::endl;
-
-    Eigen::Vector3d a(0, 0, 0), b(0, 0, 0);
-    double dist = box_box_closest_pts(*box_a, tx_a, *box_b, tx_b, a, b);
-    printf("dist: %f\n", dist);
-    auto v = a - b;
-    double dist_between_shapes_along_d = v.dot(vec_normalized);
-    return dist_between_shapes_along_d;
+    update_locals(a_shape, count_a, local_points_a);
+    update_locals(b_shape, count_b, local_points_b);
   }
 
-  return 0.0;
-}
-
-static double compute_dist_between_shapes(
-  std::shared_ptr<fcl::ShapeBase<double>> shape_a, 
-  const fcl::Transform3d& tx_a,
-  std::shared_ptr<fcl::ShapeBase<double>> shape_b, 
-  const fcl::Transform3d& tx_b,
-  Eigen::Vector3d& a, Eigen::Vector3d& b
-)
-{
-  if (shape_a->getNodeType() == fcl::GEOM_SPHERE && 
-    shape_b->getNodeType() == fcl::GEOM_SPHERE)
-  {
-    auto sphere_a =
-      std::dynamic_pointer_cast<fcl::Sphered>(shape_a);
-    auto sphere_b =
-      std::dynamic_pointer_cast<fcl::Sphered>(shape_b);
-
-    double dist = 0.0;
-    fcl::detail::sphereSphereDistance(
-      *sphere_a, tx_a, *sphere_b, tx_b,
-      &dist, &a, &b);
-    /*Eigen::Vector3d b_to_a = a_shape_tx.translation() - b_shape_tx.translation();
-    dist = b_to_a.norm() - (a_shape._radius + b_shape._radius);*/
-    return dist;
-  }
-  else if (shape_a->getNodeType() == fcl::GEOM_SPHERE && 
-    shape_b->getNodeType() == fcl::GEOM_BOX)
-  {
-    auto sphere_a =
-      std::dynamic_pointer_cast<fcl::Sphered>(shape_a);
-    auto box_b =
-      std::dynamic_pointer_cast<fcl::Boxd>(shape_b);
-
-    double dist = 0.0;
-    fcl::detail::sphereBoxDistance(*sphere_a, tx_a, *box_b, tx_b, &dist, &a, &b);
-    return dist;
-  }
-  else if (shape_a->getNodeType() == fcl::GEOM_BOX && 
-    shape_b->getNodeType() == fcl::GEOM_SPHERE)
-  {
-    auto box_a =
-      std::dynamic_pointer_cast<fcl::Boxd>(shape_a);
-    auto sphere_b =
-      std::dynamic_pointer_cast<fcl::Sphered>(shape_b);
-
-    double dist = 0.0;
-    fcl::detail::sphereBoxDistance(*sphere_b, tx_b, *box_a, tx_a, &dist, &b, &a);
-    return dist;
-  }
-  else if (shape_a->getNodeType() == fcl::GEOM_BOX && 
-    shape_b->getNodeType() == fcl::GEOM_BOX)
-  {
-    auto box_a =
-      std::dynamic_pointer_cast<fcl::Boxd>(shape_a);
-    auto box_b =
-      std::dynamic_pointer_cast<fcl::Boxd>(shape_b);
-
-    double dist = box_box_closest_pts(*box_a, tx_a, *box_b, tx_b, a, b);
-    //std::cout << "a:\n" << a << std::endl;
-    //std::cout << "b:\n" << b << std::endl;
-    rmf_planner_viz::draw::IMDraw::draw_circle(sf::Vector2f(a.x(), a.y()), 0.125, sf::Color(255, 255, 255, 255));
-    rmf_planner_viz::draw::IMDraw::draw_circle(sf::Vector2f(b.x(), b.y()), 0.125, sf::Color(255, 255, 255, 255));
-    return dist;
-  }
-
-  return 0.0;
-}
-
-static double max_splinemotion_advancement(double current_t,
-  fcl::SplineMotion<double>& motion_a, 
-  fcl::SplineMotion<double>& motion_b,
-  const std::vector<ModelSpaceShape>& a_shapes,
-  const std::vector<ModelSpaceShape>& b_shapes,
-  const Eigen::Vector3d& d_normalized, double max_dist,
-  const Eigen::Vector3d& reference_point,
-  uint& dist_checks, double tolerance)
-{
-  assert(tolerance >= 0.0);
-  
-  double lower_t_limit = current_t;
-  double upper_t_limit = 1.0;
-  uint bilateral_adv_iter = 0;
-
-  auto compute_seperation = [&](double t)
+  double compute_seperation(double t,
+    fcl::SplineMotion<double>& motion_a,
+    fcl::SplineMotion<double>& motion_b,
+    const ModelSpaceShape& a_shape,
+    const ModelSpaceShape& b_shape)
   {
     motion_a.integrate(t);
     motion_b.integrate(t);
@@ -519,132 +349,303 @@ static double max_splinemotion_advancement(double current_t,
     motion_a.getCurrentTransform(a_tx);
     motion_b.getCurrentTransform(b_tx);
 
-    double s = DBL_MAX;
-    // compute seperation between all shapes in direction d and take the minimum
-    for (const auto& a_shape : a_shapes)
+    auto a_shape_tx = a_tx * a_shape._transform;
+    auto b_shape_tx = b_tx * b_shape._transform;
+
+    // get one support point on both a and b
+    // if e_points
+    if (count_a == 1 && count_b == 1) 
     {
-      auto a_shape_tx = a_tx * a_shape._transform;
-      for (const auto& b_shape : b_shapes)
+      // shortcut for sphere-sphere
+      support_vertex_a = 0;
+      support_vertex_b = 0;
+
+      auto tx1 = a_shape_tx * local_points_a[support_vertex_a];
+      auto tx2 = b_shape_tx * local_points_b[support_vertex_b];
+      double s = seperation_axis.dot(tx2 - tx1);
+      return s;
+    }
+    else
+    {
+      auto get_support = [](const Eigen::Vector3d& axis,
+        int count, Eigen::Vector3d (&local_points)[4])
       {
-        auto b_shape_tx = b_tx * b_shape._transform;
-        
-        double seperation = compute_seperation_between_shapes_along_vector(
-          a_shape.shape, a_shape_tx, 
-          b_shape.shape, b_shape_tx,
-          d_normalized, reference_point);
-
-        // get the minimum
-        if (seperation < s)
-          s = seperation;
-      }
+        int best_idx = 0;
+        double best_dotp = axis.dot(local_points[0]);
+        printf("dotp 0: %f\n", best_dotp);
+        for (int i=1; i<count; ++i)
+        {
+          double dotp = axis.dot(local_points[i]);
+          printf("dotp %d: %f\n", i, dotp);
+          if (dotp > best_dotp)
+          {
+            best_idx = i;
+            best_dotp = dotp;
+          }
+        }
+        return best_idx;
+      };
+      
+      support_vertex_a = get_support(a_shape_tx.linear() * seperation_axis, count_a, local_points_a);
+      support_vertex_b = get_support(b_shape_tx.linear() * -seperation_axis, count_b, local_points_b);
+      printf("vtx a: %d b: %d\n", support_vertex_a, support_vertex_b);
+      
+      auto point_a = a_shape_tx * local_points_a[support_vertex_a];
+      auto point_b = b_shape_tx * local_points_b[support_vertex_b];
+      rmf_planner_viz::draw::IMDraw::draw_circle(sf::Vector2f(point_b.x(), point_b.y()), 0.15f);
+      double s = seperation_axis.dot(point_b - point_a);
+      return s;
     }
-    return s;
-  };
-  
-  double s1 = max_dist; 
-  double s2 = compute_seperation(1.0);
-  //printf("s2: %f\n", s2);
-  double sample_t = 0.0;
-  for (;;)
-  {
-#ifdef DO_LOGGING
-    //if (bilateral_adv_iter < 3)
-      printf("#1: (%f,%f) #2: (%f,%f)\n", lower_t_limit, s1, upper_t_limit, s2);
-#endif
-    
-    // alternate between bisection and false position methods
-    if (bilateral_adv_iter & 1/* && ((s1 < 0.0 && s2 > 0.0) || (s1 > 0.0 && s2 < 0.0))*/)
-    {
-      // use false position method
-      // solve for t where (t, tolerance) for a line with 
-      // endpoints (lower_t_limit, s1) and (upper_t_limit, s2)
-      // where s2 is negative and s1 is positive
-      double inv_m = (upper_t_limit - lower_t_limit) / (s2 - s1);
-      sample_t = lower_t_limit + (tolerance - s1) * inv_m;
-    }
-    else // bisection method
-      sample_t = lower_t_limit + 0.5 * (upper_t_limit - lower_t_limit);
-#ifdef DO_LOGGING
-    printf("iteration: %d picked t: %f\n", bilateral_adv_iter, sample_t);
-#endif
-
-    double s = compute_seperation(sample_t);
-
-#ifdef DO_LOGGING
-    printf("dist_output: %f\n", s);
-#endif
-    if (abs(s) < tolerance)
-    {
-#ifdef DO_LOGGING
-      printf("minimal dist %f within tolerance range %f\n", s, tolerance);
-#endif
-      break;
-    }
-
-    // our window is very small and we're hopping around, so we stop.
-    // Also, this is what box2d does.
-    if (bilateral_adv_iter >= 25) 
-    {
-#ifdef DO_LOGGING
-      printf("range too small\n");
-#endif
-      break;
-    }
-    
-    if (s < 0.0)
-    {
-      upper_t_limit = sample_t;
-      s2 = s;
-    }
-    else if (s > 0.0)
-    {
-      lower_t_limit = sample_t;
-      s1 = s;
-    }
-    ++bilateral_adv_iter;
+    //@todo
+    return 0.0;
   }
-  dist_checks += bilateral_adv_iter;
 
-  return sample_t;
-}
+  double evaluate(double t,
+    fcl::SplineMotion<double>& motion_a,
+    fcl::SplineMotion<double>& motion_b,
+    const ModelSpaceShape& a_shape,
+    const ModelSpaceShape& b_shape)
+  {
+    motion_a.integrate(t);
+    motion_b.integrate(t);
 
-bool collide_seperable_circles(
+    fcl::Transform3d a_tx, b_tx;
+    motion_a.getCurrentTransform(a_tx);
+    motion_b.getCurrentTransform(b_tx);
+    
+    auto a_shape_tx = a_tx * a_shape._transform;
+    auto b_shape_tx = b_tx * b_shape._transform;
+    
+    auto p_a = a_shape_tx * local_points_a[support_vertex_a];
+    auto p_b = b_shape_tx * local_points_b[support_vertex_b];
+    double s = seperation_axis.dot(p_b - p_a);
+    return s;
+  }
+};
+
+enum MOTION_ADVANCEMENT_RESULT
+{
+  RESTART = 0,
+  COLLIDE,
+  FAIL,
+};
+
+static MOTION_ADVANCEMENT_RESULT max_motion_advancement(double current_t,
   fcl::SplineMotion<double>& motion_a, 
   fcl::SplineMotion<double>& motion_b,
-  const std::vector<ModelSpaceShape>& a_shapes,
-  const std::vector<ModelSpaceShape>& b_shapes,
-  double& impact_time, uint& dist_checks, uint safety_maximum_checks, double tolerance)
+  const ModelSpaceShape& a_shape,
+  const ModelSpaceShape& b_shape,
+  const Eigen::Vector3d& d_normalized,
+  double target_length, double tolerance, 
+  uint& dist_checks, double& t_out)
 {
-  if (a_shapes.empty() || b_shapes.empty())
-    return false;
+  assert(tolerance >= 0.0);
+  
+  target_length = target_length;
 
+#ifdef DO_LOGGING
+  printf("======\n");
+  printf("target_length: %f\n", target_length);
+#endif
+  SeperationComputation computation(d_normalized, a_shape, b_shape);
+  uint outerloop_iter = 0;
+  double t1 = current_t, t2 = 1.0;
+  for (;;)
+  {
+    // find min seperation of points
+    float s2 = computation.compute_seperation(t2,
+      motion_a, motion_b, a_shape, b_shape);
+#ifdef DO_LOGGING
+    printf("outerloop_iter %d\n", outerloop_iter);
+    printf("  (t2:%f, s2:%f)\n", t2, s2);
+#endif
+    // final configuration reached
+    if (s2 > target_length + tolerance)
+    {
+#ifdef DO_LOGGING
+      //output->state = b2TOIOutput::e_separated;
+      printf("e_separated\n");
+#endif
+      t_out = 1.0;
+      return COLLIDE;
+    }
+
+    if (s2 > target_length - tolerance)
+    {
+      t_out = t2;
+#ifdef DO_LOGGING
+      printf("restart %f\n", t_out);
+#endif
+      return RESTART; // restart from a new configuration
+    }
+    
+    // Compute the initial separation of the witness points.
+    double s1 = computation.evaluate(t1,
+      motion_a, motion_b, a_shape, b_shape);
+#ifdef DO_LOGGING
+    printf("  (t1:%f, s1:%f)\n", t1, s1);
+#endif
+
+    // initial overlap test
+    if (s1 < target_length - tolerance)
+    {
+#ifdef DO_LOGGING
+      //output->state = b2TOIOutput::e_failed;
+      printf("e_failed, target_length:%f\n", target_length);
+#endif
+      t_out = t1;
+      return FAIL;
+    }
+
+    // Check for touching
+    if (s1 <= target_length + tolerance)
+    {
+      // Victory! t1 should hold the TOI (could be 0.0).
+#ifdef DO_LOGGING
+      //output->state = b2TOIOutput::e_touching;
+      printf("e_touching, target_length: %f\n", target_length);
+#endif
+      t_out = t1;
+      return COLLIDE;
+    }
+
+    // Compute 1D root of: f(x) - target_length = 0
+    uint rootfind_iter = 0;
+    double a1 = t1, a2 = t2;
+    for (;;)
+    {
+      double t;
+      if (rootfind_iter & 1) // Secant rule
+        t = a1 + (target_length - s1) * (a2 - a1) / (s2 - s1);
+      else
+        t = 0.5 * (a1 + a2); // Bisection
+      
+      ++rootfind_iter;
+      
+      double s = computation.evaluate(t,
+        motion_a, motion_b, a_shape, b_shape);
+#ifdef DO_LOGGING
+			printf("    (t:%f, s:%f)\n", t, s);
+#endif
+
+      if (abs(s - target_length) < tolerance)
+      {
+        t2 = t;
+        break;
+      }
+
+      // Ensure we continue to bracket the root.
+      if (s > target_length)
+      {
+        a1 = t;
+        s1 = s;
+      }
+      else
+      {
+        a2 = t;
+        s2 = s;
+      }
+
+      if (rootfind_iter >= 25)
+        break;
+    }
+
+    ++outerloop_iter;
+    dist_checks = dist_checks + rootfind_iter + outerloop_iter;
+    //if (pushBackIter == b2_maxPolygonVertices)
+    if (outerloop_iter >= 50)
+      break;
+  }
+#ifdef DO_LOGGING
+  printf("exit\n");
+#endif
+  return FAIL;
+}
+
+bool collide_pairwise_shapes(
+  fcl::SplineMotion<double>& motion_a, 
+  fcl::SplineMotion<double>& motion_b,
+  const ModelSpaceShape& a_shape,
+  const ModelSpaceShape& b_shape,
+  double& impact_time, uint& dist_checks, 
+  uint safety_maximum_checks, double tolerance)
+{
   auto calc_min_dist = [](
     const fcl::Transform3d& a_tx,
     const fcl::Transform3d& b_tx,
-    const std::vector<ModelSpaceShape>& a_shapes,
-    const std::vector<ModelSpaceShape>& b_shapes,
-    Eigen::Vector3d& d, Eigen::Vector3d& reference_pt, double& min_dist)
+    const ModelSpaceShape& a_shape,
+    const ModelSpaceShape& b_shape,
+    Eigen::Vector3d& d, double& dist_closest_features,
+    double& target_length)
   {
-    min_dist = DBL_MAX;
-    for (const auto& a_shape : a_shapes)
+    auto a_shape_tx = a_tx * a_shape._transform;
+    auto b_shape_tx = b_tx * b_shape._transform;
+
+    if (a_shape.shape->getNodeType() == fcl::GEOM_SPHERE && 
+        b_shape.shape->getNodeType() == fcl::GEOM_SPHERE)
     {
-      auto a_shape_tx = a_tx * a_shape._transform;
+      auto sphere_a =
+        std::dynamic_pointer_cast<fcl::Sphered>(a_shape.shape);
+      auto sphere_b =
+        std::dynamic_pointer_cast<fcl::Sphered>(b_shape.shape);
 
-      for (const auto& b_shape : b_shapes)
-      {
-        auto b_shape_tx = b_tx * b_shape._transform;
-        Eigen::Vector3d a(0,0,0), b(0,0,0);
-        double dist = compute_dist_between_shapes(a_shape.shape, a_shape_tx,
-          b_shape.shape, b_shape_tx, a, b);
-
-        if (dist < min_dist)
-        {
-          min_dist = dist;
-          d = a - b;
-          reference_pt = a;
-        }
-      }
+      auto a = a_shape_tx.translation();
+      auto b = b_shape_tx.translation();
+      d = b - a;
+      dist_closest_features = d.norm();
+      
+      d /= dist_closest_features;
+      target_length = sphere_a->radius + sphere_b->radius;
     }
+    else if (a_shape.shape->getNodeType() == fcl::GEOM_SPHERE && 
+        b_shape.shape->getNodeType() == fcl::GEOM_BOX)
+    {
+      auto sphere_a =
+        std::dynamic_pointer_cast<fcl::Sphered>(a_shape.shape);
+      auto box_b =
+        std::dynamic_pointer_cast<fcl::Boxd>(b_shape.shape);
+
+      Eigen::Vector3d a(0, 0, 0), b(0, 0, 0);
+      fcl::detail::sphereBoxDistance(*sphere_a, a_shape_tx, *box_b, b_shape_tx, 
+        &dist_closest_features, &a, &b);
+
+      d = b - a;
+      d /= dist_closest_features;
+      target_length = sphere_a->radius;
+    }
+    else if (a_shape.shape->getNodeType() == fcl::GEOM_BOX && 
+        b_shape.shape->getNodeType() == fcl::GEOM_SPHERE)
+    {
+      auto box_a =
+        std::dynamic_pointer_cast<fcl::Boxd>(a_shape.shape);
+      auto sphere_b =
+        std::dynamic_pointer_cast<fcl::Sphered>(b_shape.shape);
+
+      Eigen::Vector3d a(0, 0, 0), b(0, 0, 0);
+      fcl::detail::sphereBoxDistance(*sphere_b, b_shape_tx, *box_a, a_shape_tx, 
+        &dist_closest_features, &b, &a);
+      
+      d = b - a;
+      d /= dist_closest_features;
+      target_length = sphere_b->radius;
+    }
+    else if (a_shape.shape->getNodeType() == fcl::GEOM_BOX && 
+        b_shape.shape->getNodeType() == fcl::GEOM_BOX)
+    {
+      auto box_a =
+        std::dynamic_pointer_cast<fcl::Boxd>(a_shape.shape);
+      auto box_b =
+        std::dynamic_pointer_cast<fcl::Boxd>(b_shape.shape);
+
+      Eigen::Vector3d a(0, 0, 0), b(0, 0, 0);
+      dist_closest_features = box_box_closest_pts(*box_a, a_shape_tx, *box_b, b_shape_tx,
+        a, b);
+      
+      d = b - a;
+      d /= dist_closest_features;
+      target_length = 0.0;
+    }
+    //@todo: exception
   };
 
   fcl::Transform3d a_start_tf, b_start_tf;
@@ -655,27 +656,31 @@ bool collide_seperable_circles(
   motion_a.getCurrentTransform(a_start_tf);
   motion_b.getCurrentTransform(b_start_tf);
 
-  double dist_along_d_to_cover = 0.0;
-  Eigen::Vector3d d(0,0,0), reference_pt(0,0,0);;
-  calc_min_dist(a_start_tf, b_start_tf, a_shapes, b_shapes,
-    d, reference_pt, dist_along_d_to_cover);
+  double target_length = 0.0;
+  double dist_to_cover = 0.0;
+  Eigen::Vector3d d(0,0,0);
+  calc_min_dist(a_start_tf, b_start_tf, a_shape, b_shape,
+    d, dist_to_cover, target_length);
   
   double t = 0.0;
   uint iter = 0;
-  while (dist_along_d_to_cover > tolerance && t < 1.0)
+  while (dist_to_cover > 0.0 && t < 1.0)
   {
-    Eigen::Vector3d d_normalized = d.normalized();
 #ifdef DO_LOGGING
     printf("======= iter:%d\n", iter);
-    std::cout << "d_norm: \n" << d_normalized << std::endl;
-    std::cout << "dist_along_d_to_cover: " << dist_along_d_to_cover << std::endl;
-    rmf_planner_viz::draw::IMDraw::draw_arrow(sf::Vector2f(0, 0), sf::Vector2f(d_normalized.x(), d_normalized.y()));
+    std::cout << "d_norm: \n" << d << std::endl;
+    std::cout << "dist_to_cover: " << dist_to_cover << std::endl;
+    rmf_planner_viz::draw::IMDraw::draw_arrow(sf::Vector2f(0, 0), sf::Vector2f(d.x(), d.y()));
 #endif
+    auto collide_result = max_motion_advancement(t, motion_a, motion_b, a_shape, b_shape, 
+      d, target_length, tolerance, dist_checks, t);
+    if (collide_result == COLLIDE)
+      break;
+    else if (collide_result == FAIL)
+      return false;
 
-    t = max_splinemotion_advancement(t, motion_a, motion_b, a_shapes, b_shapes, 
-      d_normalized, dist_along_d_to_cover, reference_pt, dist_checks, tolerance);
 #ifdef DO_LOGGING
-    printf("max_splinemotion_advancement returns t: %f\n", t);
+    printf("max_motion_advancement returns t: %f\n", t);
 #endif
 
     motion_a.integrate(t);
@@ -684,16 +689,9 @@ bool collide_seperable_circles(
     motion_a.getCurrentTransform(a_tf);
     motion_b.getCurrentTransform(b_tf);
 
-    double next_dist_to_cover = 0.0;
-    calc_min_dist(a_tf, b_tf, a_shapes, b_shapes,
-      d, reference_pt, next_dist_to_cover);
+    calc_min_dist(a_tf, b_tf, a_shape, b_shape,
+      d, dist_to_cover, target_length);
 
-    /*if (next_dist_to_cover <= tolerance)
-      break;*/
-    /*if (next_dist_to_cover > dist_along_d_to_cover)
-      return false;*/
-    dist_along_d_to_cover = next_dist_to_cover;
-    //printf("dist_along_d_to_cover: %g\n", dist_along_d_to_cover);
     ++dist_checks;
     ++iter;
     
@@ -716,6 +714,37 @@ bool collide_seperable_circles(
 #ifdef DO_LOGGING
   printf("no collide\n");
 #endif
+  return false;
+}
+
+bool collide_seperable_shapes(
+  fcl::SplineMotion<double>& motion_a, 
+  fcl::SplineMotion<double>& motion_b,
+  const std::vector<ModelSpaceShape>& a_shapes,
+  const std::vector<ModelSpaceShape>& b_shapes,
+  double& impact_time, uint& iterations, uint safety_maximum_iterations, double tolerance)
+{
+  for (const auto& a_shape : a_shapes)
+  {
+    for (const auto& b_shape : b_shapes)
+    {
+      uint iterations_this_pair = 0;
+      double toi = 0.0;
+      bool collide = collide_pairwise_shapes(
+        motion_a, motion_b, a_shape, b_shape, toi, 
+        iterations_this_pair, safety_maximum_iterations,
+        tolerance);
+
+      iterations += iterations_this_pair;
+
+      if (collide)
+      {
+        //we can have some leeway on accurancy of the TOI
+        impact_time = toi; 
+        return true;
+      }
+    }
+  }
   return false;
 }
 
@@ -746,18 +775,18 @@ std::vector<Preset> setup_presets()
     p._type = PRESET_SPLINEMOTION;
 
     p.a_shapes.emplace_back(identity, std::make_shared<fcl::Boxd>(1.5, 1.5, 0));
-    //p.b_shapes.emplace_back(identity, std::make_shared<fcl::Boxd>(1.0, 1.0, 0));
+    p.b_shapes.emplace_back(identity, std::make_shared<fcl::Boxd>(1.0, 1.0, 0));
     //p.a_shapes.emplace_back(identity, std::make_shared<fcl::Sphered>(0.5));
     //p.b_shapes.emplace_back(identity, std::make_shared<fcl::Sphered>(0.5));
 
     fcl::Transform3<double> shape_b2_offset;
     shape_b2_offset.setIdentity();
-    shape_b2_offset.pretranslate(Eigen::Vector3d(0, -1.0, 0));
-    p.b_shapes.emplace_back(shape_b2_offset, std::make_shared<fcl::Sphered>(0.6));
-    //p.b_shapes.emplace_back(shape_b2_offset, std::make_shared<fcl::Boxd>(1.2, 1.2, 0));
+    shape_b2_offset.pretranslate(Eigen::Vector3d(0, -3.0, 0));
+    //p.b_shapes.emplace_back(shape_b2_offset, std::make_shared<fcl::Sphered>(0.6));
+    p.b_shapes.emplace_back(shape_b2_offset, std::make_shared<fcl::Boxd>(1.2, 1.2, 0));
     
-    p.b_start = Eigen::Vector3d(-3, 1, 0);
-    p.b_end = Eigen::Vector3d(0, 1, 0);
+    p.b_start = Eigen::Vector3d(-3, 0, 0);
+    p.b_end = Eigen::Vector3d(0, 0, 0);
     presets.push_back(p);
   }
 
@@ -768,11 +797,13 @@ std::vector<Preset> setup_presets()
 
     p.a_shapes.emplace_back(identity, std::make_shared<fcl::Sphered>(0.5));
     p.b_shapes.emplace_back(identity, std::make_shared<fcl::Sphered>(0.5));
+    //p.b_shapes.emplace_back(identity, std::make_shared<fcl::Boxd>(1.0, 1.0, 0));
 
     fcl::Transform3<double> shape_b2_offset;
     shape_b2_offset.setIdentity();
     shape_b2_offset.pretranslate(Eigen::Vector3d(0, -1.0, 0));
-    p.b_shapes.emplace_back(shape_b2_offset, std::make_shared<fcl::Sphered>(0.6));
+    //p.b_shapes.emplace_back(shape_b2_offset, std::make_shared<fcl::Sphered>(0.6));
+    p.b_shapes.emplace_back(shape_b2_offset, std::make_shared<fcl::Boxd>(1.0, 1.0, 0));
     
     p.b_start = Eigen::Vector3d(-2, 0, 0);
     p.b_end = Eigen::Vector3d(-2, 0, EIGEN_PI / 2.0);
@@ -799,8 +830,9 @@ std::vector<Preset> setup_presets()
     
     p.a_end = Eigen::Vector3d(0, 0, -EIGEN_PI);
 
-    p.b_start = Eigen::Vector3d(-3.8, 0, 0);
-    p.b_end = Eigen::Vector3d(-2.5, 0, EIGEN_PI);
+    //p.b_start = Eigen::Vector3d(-3.8, 0, 0);
+    p.b_start = Eigen::Vector3d(-2.0, 0, 0);
+    p.b_end = Eigen::Vector3d(-2.0, 0, EIGEN_PI);
 
     presets.push_back(p);
   }
@@ -908,7 +940,7 @@ std::vector<Preset> setup_presets()
     p.b_start = Eigen::Vector3d(-5, 0, 0);
     p.b_end = Eigen::Vector3d(-2, 0, 0);
 
-    p.b_vel = Eigen::Vector3d(0, 16, 0);
+    p.b_vel = Eigen::Vector3d(16, 0, 0);
 
     presets.push_back(p);
   }

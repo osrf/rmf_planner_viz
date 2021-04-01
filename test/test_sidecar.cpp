@@ -405,12 +405,12 @@ int main()
       {
         auto start = get_start_time();
         double toi = 0.0;
-        uint dist_checks = 0;
-        bool collide = collide_seperable_circles(
+        uint iterations = 0;
+        bool collide = collide_seperable_shapes(
           *(fcl::SplineMotion<double>*)motion_a.get(),
           *(fcl::SplineMotion<double>*)motion_b.get(),
           a_shapes, b_shapes,
-          toi, dist_checks, 120, (double)tolerance);
+          toi, iterations, 120, (double)tolerance);
 
         auto end = get_end_time();
         if (collide)
@@ -435,7 +435,7 @@ int main()
         double val = dur.count();
         ImGui::Text("Time taken (ms): %.10g", val);
 #endif
-        ImGui::Text("Distance checks: %d", dist_checks);
+        ImGui::Text("Iterations: %d", iterations);
       }
 
       // reset the motions
