@@ -49,7 +49,8 @@ bool collide_seperable_shapes(
   const std::vector<ModelSpaceShape>& a_shapes,
   const std::vector<ModelSpaceShape>& b_shapes,
   double& impact_time, uint& iterations, 
-  uint safety_maximum_iterations = 120, double tolerance = 0.001);
+  uint safety_maximum_iterations = 120,
+  double tolerance = 0.001, double t_max = 1.0);
 
 fcl::SplineMotion<double> to_fcl(const std::array<Eigen::Vector3d, 4>& knots);
 
