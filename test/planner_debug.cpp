@@ -43,7 +43,8 @@ void do_planner_debug(
   const std::chrono::steady_clock::time_point& plan_start_timing,
   bool force_replan,
   bool& show_node_trajectories,
-  std::vector<rmf_planner_viz::draw::Trajectory>& trajectories_to_render)
+  std::vector<rmf_planner_viz::draw::Trajectory>& trajectories_to_render,
+  rmf_planner_viz::draw::Schedule& schedule)
 {
   static rmf_utils::optional<rmf_traffic::agv::Plan> current_plan;
   static float node_inspection_timeline_control = 0.0f;
@@ -289,6 +290,8 @@ void do_planner_debug(
     auto trajectory_start_time = rmf_traffic::time::apply_offset(
       start_timestamp, solved_plan_timeline_control);
 
+    schedule.timespan(trajectory_start_time);
+
     static bool show_solved_plan = true;
     ImGui::Checkbox("Show solved plan itinerary", &show_solved_plan);
     if (show_solved_plan)
@@ -299,7 +302,7 @@ void do_planner_debug(
         if (route.map() != chosen_map)
           continue;
         auto trajectory = rmf_planner_viz::draw::Trajectory(traj,
-          profile, trajectory_start_time, std::nullopt, sf::Color::Green, { 0.0, 0.0 }, 0.5f);
+          profile, trajectory_start_time, std::nullopt, sf::Color::Red, { 0.0, 0.0 }, 0.5f);
         trajectories_to_render.push_back(trajectory);
       }
     }
@@ -361,13 +364,15 @@ void do_planner_debug(
       auto trajectory_start_time = rmf_traffic::time::apply_offset(
         rmf_traffic::Time(std::chrono::nanoseconds(start_time)), node_inspection_timeline_control);
 
+      schedule.timespan(trajectory_start_time);
+
       if (render_inspected_node_trajectories)
       {
         for (const auto& route : routes_from_parent)
         {
           const auto& traj = route.trajectory();
           auto trajectory = rmf_planner_viz::draw::Trajectory(traj,
-            profile, trajectory_start_time, std::nullopt, sf::Color::Green, { 0.0, 0.0 }, 0.5f);
+            profile, trajectory_start_time, std::nullopt, sf::Color::Red, { 0.0, 0.0 }, 0.5f);
           trajectories_to_render.push_back(trajectory);
         }
       }

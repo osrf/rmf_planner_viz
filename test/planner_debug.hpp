@@ -23,6 +23,7 @@
 #include <rmf_traffic/agv/debug/debug_Planner.hpp>
 
 #include <rmf_planner_viz/draw/Trajectory.hpp>
+#include <rmf_planner_viz/draw/Schedule.hpp>
 
 #include <queue>
 
@@ -58,7 +59,8 @@ void do_planner_debug(
   const std::chrono::steady_clock::time_point& plan_start_timing, // earliest time the timeline starts from
   bool force_replan,
   bool& show_node_trajectories,
-  std::vector<rmf_planner_viz::draw::Trajectory>& trajectories_to_render);
+  std::vector<rmf_planner_viz::draw::Trajectory>& trajectories_to_render,
+  rmf_planner_viz::draw::Schedule& schedule);
 
 bool do_planner_presets(
   std::vector<rmf_traffic::agv::Planner::Start>& starts,

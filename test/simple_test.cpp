@@ -38,6 +38,7 @@
 
 int main(int argc, char* argv[])
 {
+  using namespace std::chrono_literals;
   sf::Font font;
   if (!font.loadFromFile("./build/rmf_planner_viz/fonts/OpenSans-Bold.ttf"))
   {
@@ -86,19 +87,19 @@ int main(int argc, char* argv[])
     *                   |
     *                   0
     **/
-    graph_0.add_waypoint(test_map_name, {0.0, -10.0}); // 0
-    graph_0.add_waypoint(test_map_name, {0.0, -5.0});  // 1
-    graph_0.add_waypoint(test_map_name, {5.0, -5.0}).set_holding_point(true);  // 2
-    graph_0.add_waypoint(test_map_name, {-10.0, 0.0}); // 3
-    graph_0.add_waypoint(test_map_name, {-5.0, 0.0}); // 4
-    graph_0.add_waypoint(test_map_name, {0.0, 0.0}); // 5
-    graph_0.add_waypoint(test_map_name, {5.0, 0.0}); // 6
-    graph_0.add_waypoint(test_map_name, {10.0, 0.0}); // 7
-    graph_0.add_waypoint(test_map_name, {0.0, 5.0}); // 8
-    graph_0.add_waypoint(test_map_name, {5.0, 5.0}).set_holding_point(true); // 9
-    graph_0.add_waypoint(test_map_name, {0.0, 10.0}); // 10
-    graph_0.add_waypoint(test_map_name, {5.0, 10.0}); // 11
-    graph_0.add_waypoint(test_map_name, {-12.0, 10.0}); // 12
+    graph_0.add_waypoint(test_map_name, {-5, -5}).set_passthrough_point(true); // 0
+    graph_0.add_waypoint(test_map_name, { 0, -5}).set_passthrough_point(true); // 1
+    graph_0.add_waypoint(test_map_name, { 5, -5}).set_passthrough_point(true); // 2
+    graph_0.add_waypoint(test_map_name, {10, -5}).set_passthrough_point(true); // 3
+    graph_0.add_waypoint(test_map_name, {-5, 0}); // 4
+    graph_0.add_waypoint(test_map_name, { 0, 0}); // 5
+    graph_0.add_waypoint(test_map_name, { 5, 0}); // 6
+    graph_0.add_waypoint(test_map_name, {10, 0}).set_passthrough_point(true); // 7
+    graph_0.add_waypoint(test_map_name, {10, 4}).set_passthrough_point(true); // 8
+    graph_0.add_waypoint(test_map_name, { 0, 8}).set_passthrough_point(true); // 9
+    graph_0.add_waypoint(test_map_name, { 5, 8}).set_passthrough_point(true); // 10
+    graph_0.add_waypoint(test_map_name, {10, 12}).set_passthrough_point(true); // 11
+    graph_0.add_waypoint(test_map_name, {12, 12}).set_passthrough_point(true); // 12
     graph_0.add_key("Interesting Waypoint", 0);
 
     auto add_bidir_lane = [&](const std::size_t w0, const std::size_t w1)
@@ -109,19 +110,19 @@ int main(int argc, char* argv[])
 
     add_bidir_lane(0, 1);
     add_bidir_lane(1, 2);
+    add_bidir_lane(2, 3);
     add_bidir_lane(1, 5);
-    add_bidir_lane(2, 6);
-    add_bidir_lane(3, 4);
+    add_bidir_lane(3, 7);
     add_bidir_lane(4, 5);
-    add_bidir_lane(5, 6);
-    add_bidir_lane(6, 7);
-    add_bidir_lane(5, 8);
-    add_bidir_lane(6, 9);
-    add_bidir_lane(8, 9);
-    add_bidir_lane(8, 10);
-    graph_0.add_lane(10, 11);
-    graph_0.add_lane(11, 9);
-    graph_0.add_lane(12, 10);
+    add_bidir_lane(6, 10);
+    add_bidir_lane(7, 8);
+    add_bidir_lane(9, 10);
+    add_bidir_lane(10, 11);
+
+
+    // Unconstrained ending
+    add_bidir_lane(5, 9);
+    add_bidir_lane(11, 12);
   }
 
   rmf_planner_viz::draw::Graph graph_0_drawable(graph_0, 1.0, font);
@@ -133,10 +134,6 @@ int main(int argc, char* argv[])
   std::shared_ptr<rmf_traffic::schedule::Database> database =
       std::make_shared<rmf_traffic::schedule::Database>();
 
-  rmf_traffic::agv::Planner planner_0(
-        rmf_traffic::agv::Planner::Configuration(graph_0, traits),
-        rmf_traffic::agv::Planner::Options(nullptr));
-
   /// Setup participants
   auto p0 = rmf_traffic::schedule::make_participant(
         rmf_traffic::schedule::ParticipantDescription{
@@ -146,6 +143,13 @@ int main(int argc, char* argv[])
           profile
         },
         database);
+
+  rmf_traffic::agv::Planner planner_0(
+        rmf_traffic::agv::Planner::Configuration(graph_0, traits),
+        rmf_traffic::agv::Planner::Options(
+          rmf_traffic::agv::ScheduleRouteValidator::make(
+            database, p0.id(), p0.description().profile()),
+          5s));
 
   auto p1 = rmf_traffic::schedule::make_participant(
         rmf_traffic::schedule::ParticipantDescription{
@@ -194,11 +198,10 @@ int main(int argc, char* argv[])
 
 
   // set plans for the participants
-  using namespace std::chrono_literals;
   auto plan_start_timing = std::chrono::steady_clock::now();
 
   std::vector<rmf_traffic::agv::Planner::Start> starts;
-  starts.emplace_back(plan_start_timing, 0, 0.0);
+  starts.emplace_back(plan_start_timing, 2, 0.0);
   // starts.emplace_back(now, 12, 0.0);
   // starts.emplace_back(now, 10, 0.0);
 
@@ -209,10 +212,35 @@ int main(int argc, char* argv[])
   //   rmf_traffic::agv::ScheduleRouteValidator::make(
   //       database, p2.id(), p2.description().profile())))->get_itinerary());
 
-  rmf_traffic::agv::Planner::Goal goal(0);
+
+  rmf_traffic::Trajectory obstacle;
+  obstacle.insert(
+    plan_start_timing + 24s,
+    {0.0, 8.0, 0.0},
+    {0.0, 0.0, 0.0});
+  obstacle.insert(
+    plan_start_timing + 50s,
+    {0.0, 0.0, 0.0},
+    {0.0, 0.0, 0.0});
+  obstacle.insert(
+    plan_start_timing + 70s,
+    {0.0, -5.0, 0.0},
+    {0.0, 0.0, 0.0});
+
+  p1.set({{test_map_name, obstacle}});
+
+
+  rmf_traffic::agv::Planner::Goal goal(12);
   rmf_traffic::agv::Planner::Debug planner_debug(planner_0);
   rmf_traffic::agv::Planner::Debug::Progress progress =
     planner_debug.begin(starts, goal, planner_0.get_default_options());
+
+  std::cout << "Initial queue size: " << progress.queue().size() << std::endl;
+  auto test_result = planner_0.plan(starts, goal);
+  if (test_result.ideal_cost().has_value())
+    std::cout << "Ideal cost: " << test_result.ideal_cost().value() << std::endl;
+  else
+    std::cout << "Impossible plan request" << std::endl;
 
   rmf_planner_viz::draw::Schedule schedule_drawable(
         database, 0.25, test_map_name, plan_start_timing);
@@ -368,14 +396,12 @@ int main(int argc, char* argv[])
     rmf_planner_viz::draw::do_planner_debug(
       profile, chosen_map,
       planner_0, starts, goal, graph_0.num_waypoints(), planner_debug, progress, plan_start_timing,
-      force_replan, show_node_trajectories, trajectories_to_render);
+      force_replan, show_node_trajectories, trajectories_to_render, schedule_drawable);
     
     ImGui::EndFrame();
 
     /*** drawing ***/
     app_window.clear();
-
-    schedule_drawable.timespan(std::chrono::steady_clock::now());
 
     sf::RenderStates states;
     fit.apply_transform(states.transform, app_window.getSize());
