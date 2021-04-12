@@ -271,6 +271,7 @@ int main()
       static std::vector<ModelSpaceShape> b_shapes;
       PRESET_TYPE preset_type = PRESET_SPLINEMOTION;
       static int current_preset = 0;
+      static uint sweeps = 1;
 
       std::string preview_val = std::to_string(current_preset);
       if (current_preset != -1 && current_preset < (int)presets.size())
@@ -324,11 +325,13 @@ int main()
           Eigen::Vector3d zero(0,0,0);
 
           tolerance = preset.tolerance;
+          sweeps = get_sweep_divisions(a_start, a_end, b_start, b_end);
 
           auto knots_a =
             rmf_planner_viz::draw::compute_knots(a_start, a_end, zero, zero);
           auto knots_b =
             rmf_planner_viz::draw::compute_knots(b_start, b_end, b_vel, -b_vel);
+          //b_end.z() - b_start.z();
 
           motion_a = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_a));
           motion_b = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_b));
@@ -349,6 +352,7 @@ int main()
       if (tolerance_override)
         tolerance = (double)tol;
       ImGui::Text("Tolerance: %f", tolerance);
+      ImGui::Text("Sweeps: %d", sweeps);
       ImGui::Separator();
 
       static bool draw_toi_shapes = true;
@@ -409,7 +413,7 @@ int main()
         bool collide = collide_seperable_shapes(
           *(fcl::SplineMotion<double>*)motion_a.get(),
           *(fcl::SplineMotion<double>*)motion_b.get(),
-          a_shapes, b_shapes,
+          sweeps, a_shapes, b_shapes,
           toi, iterations, 120, (double)tolerance);
 
         auto end = get_end_time();

@@ -30,7 +30,7 @@
 #include <fcl/narrowphase/detail/primitive_shape_algorithm/sphere_box.h>
 #include <fcl/narrowphase/detail/primitive_shape_algorithm/box_box.h>
 
-#define DO_LOGGING 1
+//#define DO_LOGGING 1
 
 namespace rmf_planner_viz {
 namespace draw {
@@ -460,10 +460,7 @@ double box_box_closest_features(
       // get the minimum 2 point indices
       double distsq[4];
       for (int i=0; i<4; ++i)
-      {
         distsq[i] = dotp[i].squaredNorm();
-        printf("distsq[i]: %f\n", distsq[i]);
-      }
 
       closest_idx_1 = 0;
       closest_idx_2 = 1;
@@ -488,7 +485,6 @@ double box_box_closest_features(
       {
         face_idx_1 = 0;
         face_idx_2 = 3;
-        printf("left, %d %d \n", closest_idx_1, closest_idx_2);
         return LEFT;
       }
       if (pts_right == 4)
@@ -530,6 +526,7 @@ double box_box_closest_features(
     seperation_info.set_indices_from_lineseg(param_a, face_a_1, face_a_2);
     seperation_info.set_indices_from_lineseg(param_b, closest_b_1, closest_b_2, false);
     
+#ifdef DO_LOGGING
     rmf_planner_viz::draw::IMDraw::draw_circle(
       sf::Vector2f(pts_a[face_a_1].x(), pts_a[face_a_1].y()), 0.0625f, sf::Color(128,128,128));
     rmf_planner_viz::draw::IMDraw::draw_circle(
@@ -539,7 +536,7 @@ double box_box_closest_features(
       sf::Vector2f(pts_b[closest_b_1].x(), pts_b[closest_b_1].y()), 0.0625f, sf::Color(0,0,255));
     rmf_planner_viz::draw::IMDraw::draw_circle(
       sf::Vector2f(pts_b[closest_b_2].x(), pts_b[closest_b_2].y()), 0.0625f, sf::Color(0,0,255));
-
+#endif
     return std::sqrt(distsq);
   }
 
@@ -629,11 +626,12 @@ struct SeperationComputation
 
       seperation_axis = point_b - point_a;
       seperation_axis.normalize();
+#ifdef DO_LOGGING
       printf("seperation_axis: %f, %f\n", seperation_axis.x(), seperation_axis.y());
+#endif
     }
     else if (initial_seperation_props.count_a == 1 && initial_seperation_props.count_b == 2)
     {
-      printf("sphere vs box %d, %d\n", initial_seperation_props.pointindices_b[0], initial_seperation_props.pointindices_b[1]);
       //seperation_axis = seperation_info.a_to_b;
 
       // get seperation_axis in local space
@@ -645,24 +643,24 @@ struct SeperationComputation
       seperation_axis.normalize();
 
       auto transformed_axis = tx_b.linear() * seperation_axis;
-
-      printf("localpoint_b1: %f, %f\n", localpoint_b1.x(), localpoint_b1.y());
-      printf("localpoint_b2: %f, %f\n", localpoint_b2.x(), localpoint_b2.y());
-
-      printf("seperation_axis: %f, %f\n", seperation_axis.x(), seperation_axis.y());
-
       local_axis_point = (localpoint_b1 + localpoint_b2) * 0.5;
 
       auto& localpoint_a = local_points_a[initial_seperation_props.pointindices_a[0]];
       auto point_a = tx_a * localpoint_a;
       auto point_b = tx_b * local_axis_point;
-      printf("point_b: %f, %f\n", point_b.x(), point_b.y());
+
       double s = transformed_axis.dot(point_a - point_b);
       if (s < 0.0)
-      {
-        printf("flip seperation_axis\n");
         seperation_axis = -seperation_axis;
-      }
+
+#ifdef DO_LOGGING
+      printf("a1 vs b2 %d, %d\n", initial_seperation_props.pointindices_b[0], initial_seperation_props.pointindices_b[1]);
+      printf("localpoint_b1: %f, %f\n", localpoint_b1.x(), localpoint_b1.y());
+      printf("localpoint_b2: %f, %f\n", localpoint_b2.x(), localpoint_b2.y());
+
+      printf("seperation_axis: %f, %f\n", seperation_axis.x(), seperation_axis.y());
+      printf("point_b: %f, %f\n", point_b.x(), point_b.y());
+#endif
     }
     else //if (initial_seperation_props.count_a == 2)
     {
@@ -676,9 +674,6 @@ struct SeperationComputation
       seperation_axis.normalize();
 
       auto transformed_axis = tx_a.linear() * seperation_axis;
-
-      printf("seperation_axis: %f, %f\n", seperation_axis.x(), seperation_axis.y());
-
       local_axis_point = (localpoint_a1 + localpoint_a2) * 0.5;
 
       auto point_a = tx_a * local_axis_point;
@@ -687,10 +682,11 @@ struct SeperationComputation
       auto point_b = tx_b * localpoint_b;
       double s = transformed_axis.dot(point_b - point_a);
       if (s < 0.0)
-      {
-        printf("flip seperation_axis\n");
         seperation_axis = -seperation_axis;
-      }
+
+#ifdef DO_LOGGING
+      printf("seperation_axis: %f, %f\n", seperation_axis.x(), seperation_axis.y());
+#endif
     }
   }
 
@@ -731,16 +727,17 @@ struct SeperationComputation
     if (initial_seperation_props.count_a == 1 && initial_seperation_props.count_b == 1) 
     {
       // shortcut for sphere-sphere
-      printf("point-point\n");
       auto transformed_axis_a = a_shape_tx.linear().inverse() * seperation_axis;
       auto transformed_axis_b = b_shape_tx.linear().inverse() * -seperation_axis;
       
       support_vertex_a = get_support(transformed_axis_a, count_a, local_points_a);
       support_vertex_b = get_support(transformed_axis_b, count_b, local_points_b);
 
+#ifdef DO_LOGGING
+      printf("point-point\n");
       printf("transformed_axis_b: %f %f\n", transformed_axis_b.x(), transformed_axis_b.y());
       printf("support_vertex_a: %d support_vertex_b: %d\n", support_vertex_a, support_vertex_b);
-
+#endif
       auto point_a = a_shape_tx * local_points_a[support_vertex_a];
       auto point_b = b_shape_tx * local_points_b[support_vertex_b];
       double s = seperation_axis.dot(point_b - point_a);
@@ -748,45 +745,43 @@ struct SeperationComputation
     }
     else if (initial_seperation_props.count_a == 1 && initial_seperation_props.count_b == 2)
     {
-      printf ("  initial_seperation_props.count_b == 2, t:%f\n", t);
 
       auto transformed_axis = b_shape_tx.linear() * seperation_axis;
-      printf("  transformed_axis: %f, %f\n", transformed_axis.x(), transformed_axis.y());
-
       auto axis_a = a_shape_tx.linear().inverse() * -transformed_axis;
-      printf("  axis_a: %f, %f\n", axis_a.x(), axis_a.y());
 
       support_vertex_a = get_support(axis_a, count_a, local_points_a);
       support_vertex_b = -1;
-      printf("  support_vertex_a: %d\n", support_vertex_a);
 
       auto point_a = a_shape_tx * local_points_a[support_vertex_a];
       auto point_b = b_shape_tx * local_axis_point;
-
+#ifdef DO_LOGGING
+      printf("  initial_seperation_props.count_b == 2, t:%f\n", t);
+      printf("  transformed_axis: %f, %f\n", transformed_axis.x(), transformed_axis.y());
+      printf("  axis_a: %f, %f\n", axis_a.x(), axis_a.y());
+      printf("  support_vertex_a: %d\n", support_vertex_a);
       printf("  point_a: %f %f\n", point_a.x(), point_a.y());
       printf("  point_b: %f %f\n", point_b.x(), point_b.y());
-
+#endif
       double s = transformed_axis.dot(point_a - point_b);
       return s;
     }
     else //if (initial_seperation_props.count_a == 2)
     {
-      printf ("  initial_seperation_props.count_a == 2, t:%f\n", t);
-
       auto transformed_axis = a_shape_tx.linear() * seperation_axis;
-      printf("  transformed_axis: %f, %f\n", transformed_axis.x(), transformed_axis.y());
       auto axis_b = b_shape_tx.linear().inverse() * -transformed_axis;
-      printf("  axis_b: %f, %f\n", axis_b.x(), axis_b.y());
-
+      
       support_vertex_a = -1;
       support_vertex_b = get_support(axis_b, count_b, local_points_b);
 
       auto point_a = a_shape_tx * local_axis_point;
       auto point_b = b_shape_tx * local_points_b[support_vertex_b];
-
+#ifdef DO_LOGGING
+      printf("  initial_seperation_props.count_a == 2, t:%f\n", t);
+      printf("  transformed_axis: %f, %f\n", transformed_axis.x(), transformed_axis.y());
+      printf("  axis_b: %f, %f\n", axis_b.x(), axis_b.y());
       printf("  point_a: %f %f\n", point_a.x(), point_a.y());
       printf("  point_b: %f %f\n", point_b.x(), point_b.y());
-
+#endif
       double s = transformed_axis.dot(point_b - point_a);
       return s;
       
@@ -965,7 +960,7 @@ static MOTION_ADVANCEMENT_RESULT max_motion_advancement(double current_t,
 
     dist_checks = dist_checks + rootfind_iter + outerloop_iter;
     //if (pushBackIter == b2_maxPolygonVertices)
-    if (outerloop_iter >= 4)
+    if (outerloop_iter >= 6)
       break;
     ++outerloop_iter;
   }
@@ -982,6 +977,7 @@ bool collide_pairwise_shapes(
   const ModelSpaceShape& b_shape,
   double& impact_time, uint& dist_checks, 
   uint safety_maximum_checks, double tolerance,
+  double t_min = 0.0,
   double t_max = 1.0)
 {
   auto calc_min_dist = [](
@@ -1074,8 +1070,8 @@ bool collide_pairwise_shapes(
   fcl::Transform3d a_tf, b_tf;
   SeperationInfo seperation_info;
 
-  motion_a.integrate(0.0);
-  motion_b.integrate(0.0);
+  motion_a.integrate(t_min);
+  motion_b.integrate(t_min);
   motion_a.getCurrentTransform(a_start_tf);
   motion_b.getCurrentTransform(b_start_tf);
 
@@ -1085,7 +1081,7 @@ bool collide_pairwise_shapes(
     seperation_info,
     dist_to_cover, target_length);
   
-  double t = 0.0;
+  double t = t_min;
   uint iter = 0;
   while (dist_to_cover > 0.0 && t < t_max)
   {
@@ -1128,7 +1124,7 @@ bool collide_pairwise_shapes(
   if (dist_checks > safety_maximum_checks)
     return false;
 
-  if (t >= 0.0 && t < t_max)
+  if (t >= t_min && t < t_max)
   {
     impact_time = t;
 #ifdef DO_LOGGING
@@ -1145,33 +1141,58 @@ bool collide_pairwise_shapes(
 bool collide_seperable_shapes(
   fcl::SplineMotion<double>& motion_a, 
   fcl::SplineMotion<double>& motion_b,
+  uint sweeps,
   const std::vector<ModelSpaceShape>& a_shapes,
   const std::vector<ModelSpaceShape>& b_shapes,
-  double& impact_time, uint& iterations, uint safety_maximum_iterations, double tolerance,
-  double t_max)
+  double& impact_time, uint& iterations, uint safety_maximum_iterations, double tolerance)
 {
   for (const auto& a_shape : a_shapes)
   {
     for (const auto& b_shape : b_shapes)
     {
       uint iterations_this_pair = 0;
-      double toi = 0.0;
-      bool collide = collide_pairwise_shapes(
-        motion_a, motion_b, a_shape, b_shape, toi, 
-        iterations_this_pair, safety_maximum_iterations,
-        tolerance, t_max);
-
-      iterations += iterations_this_pair;
-
-      if (collide)
+      double t_per_sweep = 1.0 / (double)sweeps;
+      for (uint i=0; i<sweeps; ++i)
       {
-        //we can have some leeway on accurancy of the TOI
-        impact_time = toi; 
-        return true;
-      }
+        double t_min = t_per_sweep * (double)i;
+        double t_max = t_per_sweep * (double)(i + 1);
+
+        double toi = 0.0;
+        bool collide = collide_pairwise_shapes(
+          motion_a, motion_b, a_shape, b_shape, toi, 
+          iterations_this_pair, safety_maximum_iterations,
+          tolerance, t_min, t_max);
+
+        iterations += iterations_this_pair;
+        if (collide)
+        {
+          //we can have some leeway on accurancy of the TOI
+          impact_time = toi; 
+          return true;
+        }
+
+      }      
     }
   }
   return false;
+}
+
+uint get_sweep_divisions(const Eigen::Vector3d& a_x0, const Eigen::Vector3d& a_x1, 
+  const Eigen::Vector3d& b_x0, const Eigen::Vector3d& b_x1)
+{
+  //it's been noted in the bilateral advancement that rotations can miss collisions
+  //the only way to handle it is to introduces sweep ranges
+
+  //@todo: it would be good to support spline velocities, ie. spline curvatures
+  double rot_diff_a = std::abs(a_x1.z() - a_x0.z());
+  double rot_diff_b = std::abs(b_x1.z() - b_x0.z());
+
+  double half_pi = EIGEN_PI * 0.5;
+  uint a_intervals = (uint)std::ceil(rot_diff_a / half_pi);
+  uint b_intervals = (uint)std::ceil(rot_diff_b / half_pi);
+  if (a_intervals == 0 && b_intervals == 0)
+    return 1;
+  return a_intervals > b_intervals ? a_intervals : b_intervals;
 }
 
 fcl::SplineMotion<double> to_fcl(const std::array<Eigen::Vector3d, 4>& knots)
@@ -1368,7 +1389,7 @@ std::vector<Preset> setup_presets()
     p.b_start = Eigen::Vector3d(-5, 0, 0);
     p.b_end = Eigen::Vector3d(-2, 0, 0);
 
-    p.b_vel = Eigen::Vector3d(16, 0, 0);
+    p.b_vel = Eigen::Vector3d(0, 16, 0);
 
     presets.push_back(p);
   }

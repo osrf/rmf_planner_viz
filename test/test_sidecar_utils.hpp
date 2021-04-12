@@ -44,13 +44,17 @@ struct ModelSpaceShape
 
 // this uses spline motions
 bool collide_seperable_shapes(
-  fcl::SplineMotion<double>& motion_a, 
+  fcl::SplineMotion<double>& motion_a,
   fcl::SplineMotion<double>& motion_b,
+  uint sweeps,
   const std::vector<ModelSpaceShape>& a_shapes,
   const std::vector<ModelSpaceShape>& b_shapes,
   double& impact_time, uint& iterations, 
   uint safety_maximum_iterations = 120,
-  double tolerance = 0.001, double t_max = 1.0);
+  double tolerance = 0.001);
+
+uint get_sweep_divisions(const Eigen::Vector3d& a_x0, const Eigen::Vector3d& a_x1, 
+  const Eigen::Vector3d& b_x0, const Eigen::Vector3d& b_x1);
 
 fcl::SplineMotion<double> to_fcl(const std::array<Eigen::Vector3d, 4>& knots);
 
