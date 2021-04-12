@@ -332,43 +332,50 @@ void do_planner_debug(
     if (selected_node->start_set_index)
       ImGui::Text("start_set_index: %lu", *selected_node->start_set_index);
 
-    static bool render_inspected_node_trajectories = false;
+    static bool render_inspected_node_trajectories = true;
     ImGui::Checkbox("Render Inspected Node Trajectories", &render_inspected_node_trajectories);
 
-    float duration = 0.f;
-    const std::vector<rmf_traffic::Route>& routes_from_parent = selected_node->route_from_parent;
-    if (!routes_from_parent.empty())
+    std::vector<rmf_traffic::Route> routes;
+    while (selected_node)
     {
-      long int start_time = LONG_MAX, end_time = 0;
-      
-      for (const auto& route : routes_from_parent)
-      {
-        auto start = route.trajectory().start_time()->time_since_epoch().count();
-        auto end = route.trajectory().finish_time()->time_since_epoch().count();
-        if (start < start_time)
-          start_time = start;
-        if (end > end_time)
-          end_time = end;
+      const std::vector<rmf_traffic::Route>& routes_from_parent = selected_node->route_from_parent;
+      routes.insert(routes.end(), routes_from_parent.begin(), routes_from_parent.end());
 
-        duration += rmf_traffic::time::to_seconds(route.trajectory().duration());
+      selected_node = selected_node->parent;
+    }
+
+    if (!routes.empty())
+    {
+      std::optional<rmf_traffic::Time> start_time;
+      std::optional<rmf_traffic::Time> finish_time;
+      for (const auto& route : routes)
+      {
+        const auto s = *route.trajectory().start_time();
+        if (!start_time.has_value() || s < *start_time)
+          start_time = s;
+
+        const auto f = *route.trajectory().finish_time();
+        if (!finish_time.has_value() || *finish_time < f)
+          finish_time = f;
       }
-      
-      ImGui::Text("Node Traj start time: %ld", start_time);
-      ImGui::Text("Node Traj finish time: %ld", end_time);
+
+      const auto duration = rmf_traffic::time::to_seconds(*finish_time - *start_time);
+      ImGui::Text("Node Traj start time: %ld", start_time.value().time_since_epoch().count());
+      ImGui::Text("Node Traj finish time: %ld", finish_time.value().time_since_epoch().count());
       ImGui::Text("Node Traj duration: %f", duration);
 
       if (node_inspection_timeline_control > duration)
         node_inspection_timeline_control = duration;
       ImGui::SliderFloat("Inspected Node Timeline Control", &node_inspection_timeline_control, 0.0f, duration);
-      
+
       auto trajectory_start_time = rmf_traffic::time::apply_offset(
-        rmf_traffic::Time(std::chrono::nanoseconds(start_time)), node_inspection_timeline_control);
+        start_time.value(), node_inspection_timeline_control);
 
       schedule.timespan(trajectory_start_time);
 
       if (render_inspected_node_trajectories)
       {
-        for (const auto& route : routes_from_parent)
+        for (const auto& route : routes)
         {
           const auto& traj = route.trajectory();
           auto trajectory = rmf_planner_viz::draw::Trajectory(traj,
@@ -376,28 +383,27 @@ void do_planner_debug(
           trajectories_to_render.push_back(trajectory);
         }
       }
-
     }
     
 
     ImGui::NewLine();
 
-    int parent_count = 0;
-    std::string parent_waypoint_str = "Parent waypoints idx: [";
-    auto parent_node = selected_node->parent;
-    while (parent_node)
-    {
-      if (parent_node->waypoint)
-        parent_waypoint_str += std::to_string(*parent_node->waypoint);
-      else
-        parent_waypoint_str += "?";
-      parent_waypoint_str += ", ";
-      parent_node = parent_node->parent;
-      ++parent_count;
-    }
-    ImGui::Text("Parent count: %d", parent_count);
-    parent_waypoint_str += "]";
-    ImGui::Text("%s", parent_waypoint_str.c_str());
+//    int parent_count = 0;
+//    std::string parent_waypoint_str = "Parent waypoints idx: [";
+//    auto parent_node = selected_node->parent;
+//    while (parent_node)
+//    {
+//      if (parent_node->waypoint)
+//        parent_waypoint_str += std::to_string(*parent_node->waypoint);
+//      else
+//        parent_waypoint_str += "?";
+//      parent_waypoint_str += ", ";
+//      parent_node = parent_node->parent;
+//      ++parent_count;
+//    }
+//    ImGui::Text("Parent count: %d", parent_count);
+//    parent_waypoint_str += "]";
+//    ImGui::Text("%s", parent_waypoint_str.c_str());
   }
 
   ImGui::End();
