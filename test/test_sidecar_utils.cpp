@@ -35,7 +35,7 @@
 namespace rmf_planner_viz {
 namespace draw {
 
-double distsq_lineseg_to_pt(
+inline double distsq_lineseg_to_pt(
   const Eigen::Vector3d (&pts)[4], int ls_idx_start, int ls_idx_end,
   const Eigen::Vector3d& pt, int* pt_on_lineseg_idx = nullptr)
 {
@@ -66,7 +66,7 @@ double distsq_lineseg_to_pt(
   return distsq;
 }
 
-double min_distsq_lineseg_to_lineseg(
+inline double min_distsq_lineseg_to_lineseg(
   const Eigen::Vector3d& p1, const Eigen::Vector3d& q1,
   const Eigen::Vector3d& p2, const Eigen::Vector3d& q2,
   double& s1, double& s2)
@@ -142,8 +142,6 @@ struct SeperationInfo
   int pointindices_a[2] = { -1, -1 };
   int pointindices_b[2] = { -1, -1 };
 
-  Eigen::Vector3d a_to_b;
-
   void set_indices_from_lineseg(double parameter, int ls_start_idx, int ls_end_idx, 
     bool use_a = true)
   {
@@ -192,11 +190,16 @@ struct SeperationInfo
     for (int i=0; i<2; ++i)
       std::swap(pointindices_a[i], pointindices_b[i]);
     std::swap(count_a, count_b);
-    a_to_b = -a_to_b;
   }
 };
 
-double sphere_box_closest_features(
+static const int INSIDE = 0b0000;
+static const int LEFT   = 0b0001;
+static const int RIGHT  = 0b0010;
+static const int BOTTOM = 0b0100;
+static const int TOP    = 0b1000;
+
+inline double sphere_box_closest_features(
   const fcl::Sphered& sphere,
   const fcl::Transform3d& tx_a,
   const fcl::Boxd& box,
@@ -216,12 +219,6 @@ double sphere_box_closest_features(
   auto box_to_sphere = sphere_center - box_center;
   double dotp1 = box_to_sphere.dot(col0_b);
   double dotp2 = box_to_sphere.dot(col1_b);
-
-  const int INSIDE = 0b0000;
-  const int LEFT   = 0b0001;
-  const int RIGHT  = 0b0010;
-  const int BOTTOM = 0b0100;
-  const int TOP    = 0b1000;
 
   int outcode = 0;
   if (dotp1 < -halfsize_x)
@@ -258,7 +255,6 @@ double sphere_box_closest_features(
     seperation_info.count_a = 1;
     seperation_info.pointindices_a[0] = 0;
 
-    seperation_info.a_to_b = -boxpt_to_sphere;
     return std::sqrt(distsq);
   }
   if (outcode == (RIGHT | BOTTOM))
@@ -275,7 +271,6 @@ double sphere_box_closest_features(
     seperation_info.count_a = 1;
     seperation_info.pointindices_a[0] = 0;
 
-    seperation_info.a_to_b = -boxpt_to_sphere;
     return std::sqrt(distsq);
   }
   if (outcode == (RIGHT | TOP))
@@ -292,7 +287,6 @@ double sphere_box_closest_features(
     seperation_info.count_a = 1;
     seperation_info.pointindices_a[0] = 0;
 
-    seperation_info.a_to_b = -boxpt_to_sphere;
     return std::sqrt(distsq);
   }
   if (outcode == (LEFT | TOP))
@@ -307,8 +301,6 @@ double sphere_box_closest_features(
 
     seperation_info.count_a = 1;
     seperation_info.pointindices_a[0] = 0;
-
-    seperation_info.a_to_b = -boxpt_to_sphere;
     return std::sqrt(distsq);
   }
 
@@ -381,7 +373,7 @@ double sphere_box_closest_features(
   return -1.0;
 }
 
-double box_box_closest_features(
+inline double box_box_closest_features(
       const fcl::Boxd& box_a,
       const fcl::Transform3d& tx_a,
       const fcl::Boxd& box_b,
@@ -417,13 +409,7 @@ double box_box_closest_features(
   pts_b[2] = center_b + col0_b * halfsize_x_b + col1_b * halfsize_y_b;
   pts_b[3] = center_b - col0_b * halfsize_x_b + col1_b * halfsize_y_b;
 
-  const int INSIDE = 0b0000;
-  const int LEFT   = 0b0001;
-  const int RIGHT  = 0b0010;
-  const int BOTTOM = 0b0100;
-  const int TOP    = 0b1000;
-
-  auto closest_box_features_outside_box_face = [&](
+  auto closest_box_features_outside_box_face = [](
     Eigen::Vector3d (&pts)[4], const Eigen::Vector3d& center,
     double halfside_x, double halfside_y,
     const Eigen::Vector3d& projection_x, const Eigen::Vector3d& projection_y,
@@ -632,8 +618,6 @@ struct SeperationComputation
     }
     else if (initial_seperation_props.count_a == 1 && initial_seperation_props.count_b == 2)
     {
-      //seperation_axis = seperation_info.a_to_b;
-
       // get seperation_axis in local space
       auto& localpoint_b1 = local_points_b[initial_seperation_props.pointindices_b[0]];
       auto& localpoint_b2 = local_points_b[initial_seperation_props.pointindices_b[1]];
@@ -703,8 +687,8 @@ struct SeperationComputation
     motion_a.getCurrentTransform(a_tx);
     motion_b.getCurrentTransform(b_tx);
 
-    auto a_shape_tx = a_tx * a_shape._transform;
-    auto b_shape_tx = b_tx * b_shape._transform;
+    a_tx = a_tx * a_shape._transform;
+    b_tx = b_tx * b_shape._transform;
 
     auto get_support = [](const Eigen::Vector3d& axis,
       int count, Eigen::Vector3d (&local_points)[4])
@@ -727,8 +711,8 @@ struct SeperationComputation
     if (initial_seperation_props.count_a == 1 && initial_seperation_props.count_b == 1) 
     {
       // shortcut for sphere-sphere
-      auto transformed_axis_a = a_shape_tx.linear().inverse() * seperation_axis;
-      auto transformed_axis_b = b_shape_tx.linear().inverse() * -seperation_axis;
+      auto transformed_axis_a = a_tx.linear().inverse() * seperation_axis;
+      auto transformed_axis_b = b_tx.linear().inverse() * -seperation_axis;
       
       support_vertex_a = get_support(transformed_axis_a, count_a, local_points_a);
       support_vertex_b = get_support(transformed_axis_b, count_b, local_points_b);
@@ -738,22 +722,22 @@ struct SeperationComputation
       printf("transformed_axis_b: %f %f\n", transformed_axis_b.x(), transformed_axis_b.y());
       printf("support_vertex_a: %d support_vertex_b: %d\n", support_vertex_a, support_vertex_b);
 #endif
-      auto point_a = a_shape_tx * local_points_a[support_vertex_a];
-      auto point_b = b_shape_tx * local_points_b[support_vertex_b];
+      auto point_a = a_tx * local_points_a[support_vertex_a];
+      auto point_b = b_tx * local_points_b[support_vertex_b];
       double s = seperation_axis.dot(point_b - point_a);
       return s;
     }
     else if (initial_seperation_props.count_a == 1 && initial_seperation_props.count_b == 2)
     {
 
-      auto transformed_axis = b_shape_tx.linear() * seperation_axis;
-      auto axis_a = a_shape_tx.linear().inverse() * -transformed_axis;
+      auto transformed_axis = b_tx.linear() * seperation_axis;
+      auto axis_a = a_tx.linear().inverse() * -transformed_axis;
 
       support_vertex_a = get_support(axis_a, count_a, local_points_a);
       support_vertex_b = -1;
 
-      auto point_a = a_shape_tx * local_points_a[support_vertex_a];
-      auto point_b = b_shape_tx * local_axis_point;
+      auto point_a = a_tx * local_points_a[support_vertex_a];
+      auto point_b = b_tx * local_axis_point;
 #ifdef DO_LOGGING
       printf("  initial_seperation_props.count_b == 2, t:%f\n", t);
       printf("  transformed_axis: %f, %f\n", transformed_axis.x(), transformed_axis.y());
@@ -767,14 +751,14 @@ struct SeperationComputation
     }
     else //if (initial_seperation_props.count_a == 2)
     {
-      auto transformed_axis = a_shape_tx.linear() * seperation_axis;
-      auto axis_b = b_shape_tx.linear().inverse() * -transformed_axis;
+      auto transformed_axis = a_tx.linear() * seperation_axis;
+      auto axis_b = b_tx.linear().inverse() * -transformed_axis;
       
       support_vertex_a = -1;
       support_vertex_b = get_support(axis_b, count_b, local_points_b);
 
-      auto point_a = a_shape_tx * local_axis_point;
-      auto point_b = b_shape_tx * local_points_b[support_vertex_b];
+      auto point_a = a_tx * local_axis_point;
+      auto point_b = b_tx * local_points_b[support_vertex_b];
 #ifdef DO_LOGGING
       printf("  initial_seperation_props.count_a == 2, t:%f\n", t);
       printf("  transformed_axis: %f, %f\n", transformed_axis.x(), transformed_axis.y());
@@ -801,29 +785,29 @@ struct SeperationComputation
     motion_a.getCurrentTransform(a_tx);
     motion_b.getCurrentTransform(b_tx);
     
-    auto a_shape_tx = a_tx * a_shape._transform;
-    auto b_shape_tx = b_tx * b_shape._transform;
+    a_tx = a_tx * a_shape._transform;
+    b_tx = b_tx * b_shape._transform;
     
     if (initial_seperation_props.count_a == 1 && initial_seperation_props.count_b == 1) 
     {
-      auto point_a = a_shape_tx * local_points_a[support_vertex_a];
-      auto point_b = b_shape_tx * local_points_b[support_vertex_b];
+      auto point_a = a_tx * local_points_a[support_vertex_a];
+      auto point_b = b_tx * local_points_b[support_vertex_b];
       double s = seperation_axis.dot(point_b - point_a);
       return s;
     }
     else if (initial_seperation_props.count_a == 1 && initial_seperation_props.count_b == 2)
     {
-      auto normal = b_shape_tx.linear() * seperation_axis;
-      auto pt_a = a_shape_tx * local_points_a[support_vertex_a];
-      auto pt_b = b_shape_tx * local_axis_point;
+      auto normal = b_tx.linear() * seperation_axis;
+      auto pt_a = a_tx * local_points_a[support_vertex_a];
+      auto pt_b = b_tx * local_axis_point;
       double s = normal.dot(pt_a - pt_b);
       return s;
     }
     else //if (initial_seperation_props.count_a == 2)
     {
-      auto normal = a_shape_tx.linear() * seperation_axis;
-      auto pt_a = a_shape_tx * local_axis_point;
-      auto pt_b = b_shape_tx * local_points_b[support_vertex_b];
+      auto normal = a_tx.linear() * seperation_axis;
+      auto pt_a = a_tx * local_axis_point;
+      auto pt_b = b_tx * local_points_b[support_vertex_b];
       double s = normal.dot(pt_b - pt_a);
       return s;
     }
@@ -837,7 +821,7 @@ enum MOTION_ADVANCEMENT_RESULT
   SEPERATED,
 };
 
-static MOTION_ADVANCEMENT_RESULT max_motion_advancement(double current_t,
+static inline MOTION_ADVANCEMENT_RESULT max_motion_advancement(double current_t,
   double t_max,
   fcl::SplineMotion<double>& motion_a, 
   fcl::SplineMotion<double>& motion_b,
@@ -845,7 +829,7 @@ static MOTION_ADVANCEMENT_RESULT max_motion_advancement(double current_t,
   const ModelSpaceShape& b_shape,
   SeperationInfo& seperation_info,
   double target_length, double tolerance, 
-  uint& dist_checks, double& t_out)
+  uint& iterations, double& t_out)
 {
   assert(tolerance >= 0.0);
   
@@ -958,7 +942,7 @@ static MOTION_ADVANCEMENT_RESULT max_motion_advancement(double current_t,
       ++rootfind_iter;
     }
 
-    dist_checks = dist_checks + rootfind_iter + outerloop_iter;
+    iterations = iterations + rootfind_iter + outerloop_iter;
     //if (pushBackIter == b2_maxPolygonVertices)
     if (outerloop_iter >= 6)
       break;
@@ -970,7 +954,7 @@ static MOTION_ADVANCEMENT_RESULT max_motion_advancement(double current_t,
   return RESTART;
 }
 
-bool collide_pairwise_shapes(
+inline bool collide_pairwise_shapes(
   fcl::SplineMotion<double>& motion_a, 
   fcl::SplineMotion<double>& motion_b,
   const ModelSpaceShape& a_shape,
@@ -992,9 +976,6 @@ bool collide_pairwise_shapes(
     seperation_info.count_a = 0;
     seperation_info.count_b = 0;
 
-    auto a_shape_tx = a_tx * a_shape._transform;
-    auto b_shape_tx = b_tx * b_shape._transform;
-
     if (a_shape.shape->getNodeType() == fcl::GEOM_SPHERE && 
         b_shape.shape->getNodeType() == fcl::GEOM_SPHERE)
     {
@@ -1003,16 +984,15 @@ bool collide_pairwise_shapes(
       auto sphere_b =
         std::dynamic_pointer_cast<fcl::Sphered>(b_shape.shape);
 
-      auto a = a_shape_tx.translation();
-      auto b = b_shape_tx.translation();
+      auto a = a_tx.translation();
+      auto b = b_tx.translation();
 
       target_length = sphere_a->radius + sphere_b->radius;
       
-      seperation_info.a_to_b = b - a;
-      double a_to_b_dist = seperation_info.a_to_b.norm();
-      dist = a_to_b_dist - target_length;
-      seperation_info.a_to_b /= a_to_b_dist;
-
+      double distsq = (b - a).squaredNorm();
+      //distsq = distsq - target_length * target_length;
+      dist = std::sqrt(distsq) - target_length;
+      
       seperation_info.count_a = 1;
       seperation_info.pointindices_a[0] = 0;
       seperation_info.count_b = 1;
@@ -1027,7 +1007,7 @@ bool collide_pairwise_shapes(
         std::dynamic_pointer_cast<fcl::Boxd>(b_shape.shape);
 
       dist = 
-        sphere_box_closest_features(*sphere_a, a_shape_tx, *box_b, b_shape_tx,
+        sphere_box_closest_features(*sphere_a, a_tx, *box_b, b_tx,
           seperation_info);
       
       target_length = sphere_a->radius;
@@ -1041,7 +1021,7 @@ bool collide_pairwise_shapes(
         std::dynamic_pointer_cast<fcl::Sphered>(b_shape.shape);
 
       dist = 
-        sphere_box_closest_features(*sphere_b, b_shape_tx, *box_a, a_shape_tx,
+        sphere_box_closest_features(*sphere_b, b_tx, *box_a, a_tx,
           seperation_info);
       
       //swap
@@ -1058,7 +1038,7 @@ bool collide_pairwise_shapes(
 
       Eigen::Vector3d a(0, 0, 0), b(0, 0, 0);
       dist = 
-        box_box_closest_features(*box_a, a_shape_tx, *box_b, b_shape_tx,
+        box_box_closest_features(*box_a, a_tx, *box_b, b_tx,
           seperation_info);
       
       target_length = 0.0;
@@ -1067,13 +1047,15 @@ bool collide_pairwise_shapes(
   };
 
   fcl::Transform3d a_start_tf, b_start_tf;
-  fcl::Transform3d a_tf, b_tf;
   SeperationInfo seperation_info;
 
   motion_a.integrate(t_min);
   motion_b.integrate(t_min);
   motion_a.getCurrentTransform(a_start_tf);
   motion_b.getCurrentTransform(b_start_tf);
+
+  a_start_tf = a_start_tf * a_shape._transform;
+  b_start_tf = b_start_tf * b_shape._transform;
 
   double target_length = 0.0;
   double dist_to_cover = 0.0;
@@ -1104,11 +1086,12 @@ bool collide_pairwise_shapes(
     printf("max_motion_advancement returns t: %f\n", t);
 #endif
 
-    motion_a.integrate(t);
-    motion_b.integrate(t);
-
+    fcl::Transform3d a_tf, b_tf;
     motion_a.getCurrentTransform(a_tf);
     motion_b.getCurrentTransform(b_tf);
+
+    a_tf = a_tf * a_shape._transform;
+    b_tf = b_tf * b_shape._transform;
 
     calc_min_dist(a_tf, b_tf, a_shape, b_shape, seperation_info,
       dist_to_cover, target_length);
@@ -1144,7 +1127,8 @@ bool collide_seperable_shapes(
   uint sweeps,
   const std::vector<ModelSpaceShape>& a_shapes,
   const std::vector<ModelSpaceShape>& b_shapes,
-  double& impact_time, uint& iterations, uint safety_maximum_iterations, double tolerance)
+  double& impact_time, uint& iterations, uint safety_maximum_iterations,
+  double tolerance)
 {
   for (const auto& a_shape : a_shapes)
   {
@@ -1264,18 +1248,22 @@ std::vector<Preset> setup_presets()
     p._description = "2 sidecars rotating and hitting";
     p._type = PRESET_SPLINEMOTION;
 
+    //p.a_shapes.emplace_back(identity, std::make_shared<fcl::Boxd>(1.0, 1.0, 0));
+    //p.b_shapes.emplace_back(identity, std::make_shared<fcl::Boxd>(1.0, 1.0, 0));
     // p.a_shapes.emplace_back(identity, std::make_shared<fcl::Sphered>(0.5));
     // p.b_shapes.emplace_back(identity, std::make_shared<fcl::Sphered>(0.5));
 
     fcl::Transform3<double> shape_a2_offset;
     shape_a2_offset.setIdentity();
     shape_a2_offset.pretranslate(Eigen::Vector3d(0, -1.0, 0));
-    p.a_shapes.emplace_back(shape_a2_offset, std::make_shared<fcl::Sphered>(0.6));
+    //p.a_shapes.emplace_back(shape_a2_offset, std::make_shared<fcl::Sphered>(0.6));
+    p.a_shapes.emplace_back(shape_a2_offset, std::make_shared<fcl::Boxd>(1.5, 1.0, 0));
     
     fcl::Transform3<double> shape_b2_offset;
     shape_b2_offset.setIdentity();
     shape_b2_offset.pretranslate(Eigen::Vector3d(0, -1.0, 0));
-    p.b_shapes.emplace_back(shape_b2_offset, std::make_shared<fcl::Sphered>(0.6));
+    //p.b_shapes.emplace_back(shape_b2_offset, std::make_shared<fcl::Sphered>(0.6));
+    p.b_shapes.emplace_back(shape_a2_offset, std::make_shared<fcl::Boxd>(0.75, 1.0, 0));
     
     p.a_end = Eigen::Vector3d(0, 0, -EIGEN_PI);
 
