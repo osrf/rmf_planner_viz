@@ -590,7 +590,8 @@ struct SeperationComputation
         local_points[2] = Eigen::Vector3d( halfside.x(),  halfside.y(), 0.0);
         local_points[3] = Eigen::Vector3d(-halfside.x(),  halfside.y(), 0.0);
       }
-      //@todo: type error
+      else
+        assert(0 && "Invalid shape type");
     };
 
     update_locals(shape_a, count_a, local_points_a);
@@ -602,7 +603,7 @@ struct SeperationComputation
 
     tx_a = tx_a * shape_a._transform;
     tx_b = tx_b * shape_b._transform;
-    
+     
     if (initial_seperation_props.count_a == 1 && initial_seperation_props.count_b == 1)
     {
       const auto& localpoint_a = local_points_a[initial_seperation_props.pointindices_a[0]];
@@ -677,18 +678,18 @@ struct SeperationComputation
   double compute_seperation(double t,
     fcl::SplineMotion<double>& motion_a,
     fcl::SplineMotion<double>& motion_b,
-    const ModelSpaceShape& a_shape,
-    const ModelSpaceShape& b_shape)
+    const ModelSpaceShape& shape_a,
+    const ModelSpaceShape& shape_b)
   {
     motion_a.integrate(t);
     motion_b.integrate(t);
 
-    fcl::Transform3d a_tx, b_tx;
-    motion_a.getCurrentTransform(a_tx);
-    motion_b.getCurrentTransform(b_tx);
+    fcl::Transform3d tx_a, tx_b;
+    motion_a.getCurrentTransform(tx_a);
+    motion_b.getCurrentTransform(tx_b);
 
-    a_tx = a_tx * a_shape._transform;
-    b_tx = b_tx * b_shape._transform;
+    tx_a = tx_a * shape_a._transform;
+    tx_b = tx_b * shape_b._transform;
 
     auto get_support = [](const Eigen::Vector3d& axis,
       int count, Eigen::Vector3d (&local_points)[4])
@@ -711,8 +712,8 @@ struct SeperationComputation
     if (initial_seperation_props.count_a == 1 && initial_seperation_props.count_b == 1) 
     {
       // shortcut for sphere-sphere
-      auto transformed_axis_a = a_tx.linear().inverse() * seperation_axis;
-      auto transformed_axis_b = b_tx.linear().inverse() * -seperation_axis;
+      auto transformed_axis_a = tx_a.linear().inverse() * seperation_axis;
+      auto transformed_axis_b = tx_b.linear().inverse() * -seperation_axis;
       
       support_vertex_a = get_support(transformed_axis_a, count_a, local_points_a);
       support_vertex_b = get_support(transformed_axis_b, count_b, local_points_b);
@@ -722,22 +723,21 @@ struct SeperationComputation
       printf("transformed_axis_b: %f %f\n", transformed_axis_b.x(), transformed_axis_b.y());
       printf("support_vertex_a: %d support_vertex_b: %d\n", support_vertex_a, support_vertex_b);
 #endif
-      auto point_a = a_tx * local_points_a[support_vertex_a];
-      auto point_b = b_tx * local_points_b[support_vertex_b];
+      auto point_a = tx_a * local_points_a[support_vertex_a];
+      auto point_b = tx_b * local_points_b[support_vertex_b];
       double s = seperation_axis.dot(point_b - point_a);
       return s;
     }
     else if (initial_seperation_props.count_a == 1 && initial_seperation_props.count_b == 2)
     {
-
-      auto transformed_axis = b_tx.linear() * seperation_axis;
-      auto axis_a = a_tx.linear().inverse() * -transformed_axis;
+      auto transformed_axis = tx_b.linear() * seperation_axis;
+      auto axis_a = tx_b.linear().inverse() * -transformed_axis;
 
       support_vertex_a = get_support(axis_a, count_a, local_points_a);
       support_vertex_b = -1;
 
-      auto point_a = a_tx * local_points_a[support_vertex_a];
-      auto point_b = b_tx * local_axis_point;
+      auto point_a = tx_a * local_points_a[support_vertex_a];
+      auto point_b = tx_b * local_axis_point;
 #ifdef DO_LOGGING
       printf("  initial_seperation_props.count_b == 2, t:%f\n", t);
       printf("  transformed_axis: %f, %f\n", transformed_axis.x(), transformed_axis.y());
@@ -751,14 +751,14 @@ struct SeperationComputation
     }
     else //if (initial_seperation_props.count_a == 2)
     {
-      auto transformed_axis = a_tx.linear() * seperation_axis;
-      auto axis_b = b_tx.linear().inverse() * -transformed_axis;
+      auto transformed_axis = tx_a.linear() * seperation_axis;
+      auto axis_b = tx_b.linear().inverse() * -transformed_axis;
       
       support_vertex_a = -1;
       support_vertex_b = get_support(axis_b, count_b, local_points_b);
 
-      auto point_a = a_tx * local_axis_point;
-      auto point_b = b_tx * local_points_b[support_vertex_b];
+      auto point_a = tx_a * local_axis_point;
+      auto point_b = tx_b * local_points_b[support_vertex_b];
 #ifdef DO_LOGGING
       printf("  initial_seperation_props.count_a == 2, t:%f\n", t);
       printf("  transformed_axis: %f, %f\n", transformed_axis.x(), transformed_axis.y());
@@ -775,39 +775,39 @@ struct SeperationComputation
   double evaluate(double t,
     fcl::SplineMotion<double>& motion_a,
     fcl::SplineMotion<double>& motion_b,
-    const ModelSpaceShape& a_shape,
-    const ModelSpaceShape& b_shape)
+    const ModelSpaceShape& shape_a,
+    const ModelSpaceShape& shape_b)
   {
     motion_a.integrate(t);
     motion_b.integrate(t);
 
-    fcl::Transform3d a_tx, b_tx;
-    motion_a.getCurrentTransform(a_tx);
-    motion_b.getCurrentTransform(b_tx);
+    fcl::Transform3d tx_a, tx_b;
+    motion_a.getCurrentTransform(tx_a);
+    motion_b.getCurrentTransform(tx_b);
     
-    a_tx = a_tx * a_shape._transform;
-    b_tx = b_tx * b_shape._transform;
+    tx_a = tx_a * shape_a._transform;
+    tx_b = tx_b * shape_b._transform;
     
     if (initial_seperation_props.count_a == 1 && initial_seperation_props.count_b == 1) 
     {
-      auto point_a = a_tx * local_points_a[support_vertex_a];
-      auto point_b = b_tx * local_points_b[support_vertex_b];
+      auto point_a = tx_a * local_points_a[support_vertex_a];
+      auto point_b = tx_b * local_points_b[support_vertex_b];
       double s = seperation_axis.dot(point_b - point_a);
       return s;
     }
     else if (initial_seperation_props.count_a == 1 && initial_seperation_props.count_b == 2)
     {
-      auto normal = b_tx.linear() * seperation_axis;
-      auto pt_a = a_tx * local_points_a[support_vertex_a];
-      auto pt_b = b_tx * local_axis_point;
+      auto normal = tx_b.linear() * seperation_axis;
+      auto pt_a = tx_a * local_points_a[support_vertex_a];
+      auto pt_b = tx_b * local_axis_point;
       double s = normal.dot(pt_a - pt_b);
       return s;
     }
     else //if (initial_seperation_props.count_a == 2)
     {
-      auto normal = a_tx.linear() * seperation_axis;
-      auto pt_a = a_tx * local_axis_point;
-      auto pt_b = b_tx * local_points_b[support_vertex_b];
+      auto normal = tx_a.linear() * seperation_axis;
+      auto pt_a = tx_a * local_axis_point;
+      auto pt_b = tx_b * local_points_b[support_vertex_b];
       double s = normal.dot(pt_b - pt_a);
       return s;
     }
@@ -816,17 +816,17 @@ struct SeperationComputation
 
 enum MOTION_ADVANCEMENT_RESULT
 {
-  RESTART = 0,
-  COLLIDE,
-  SEPERATED,
+  ADV_RESTART = 0,
+  ADV_COLLIDE,
+  ADV_SEPERATED,
 };
 
 static inline MOTION_ADVANCEMENT_RESULT max_motion_advancement(double current_t,
   double t_max,
   fcl::SplineMotion<double>& motion_a, 
   fcl::SplineMotion<double>& motion_b,
-  const ModelSpaceShape& a_shape,
-  const ModelSpaceShape& b_shape,
+  const ModelSpaceShape& shape_a,
+  const ModelSpaceShape& shape_b,
   SeperationInfo& seperation_info,
   double target_length, double tolerance, 
   uint& iterations, double& t_out)
@@ -840,14 +840,14 @@ static inline MOTION_ADVANCEMENT_RESULT max_motion_advancement(double current_t,
   printf("======\n");
   printf("target_length: %f\n", target_length);
 #endif
-  SeperationComputation computation(motion_a, motion_b, a_shape, b_shape, seperation_info);
+  SeperationComputation computation(motion_a, motion_b, shape_a, shape_b, seperation_info);
   uint outerloop_iter = 0;
   double t1 = current_t, t2 = t_max;
   for (;;)
   {
     // find min seperation of points
     float s2 = computation.compute_seperation(t2,
-      motion_a, motion_b, a_shape, b_shape);
+      motion_a, motion_b, shape_a, shape_b);
 #ifdef DO_LOGGING
     printf("outerloop_iter %d\n", outerloop_iter);
     printf("  (t2:%f, s2:%f)\n", t2, s2);
@@ -860,7 +860,7 @@ static inline MOTION_ADVANCEMENT_RESULT max_motion_advancement(double current_t,
       printf("e_separated\n");
 #endif
       t_out = t_max;
-      return SEPERATED;
+      return ADV_SEPERATED;
     }
 
     if (s2 > target_length - tolerance)
@@ -869,12 +869,12 @@ static inline MOTION_ADVANCEMENT_RESULT max_motion_advancement(double current_t,
 #ifdef DO_LOGGING
       printf("restart %f\n", t_out);
 #endif
-      return RESTART; // restart from a new configuration
+      return ADV_RESTART; // restart from a new configuration
     }
     
     // Compute the initial separation of the witness points.
     double s1 = computation.evaluate(t1,
-      motion_a, motion_b, a_shape, b_shape);
+      motion_a, motion_b, shape_a, shape_b);
 #ifdef DO_LOGGING
     printf("  (t1:%f, s1:%f)\n", t1, s1);
 #endif
@@ -887,7 +887,7 @@ static inline MOTION_ADVANCEMENT_RESULT max_motion_advancement(double current_t,
       printf("e_failed, target_length:%f\n", target_length);
 #endif
       t_out = t1;
-      return SEPERATED;
+      return ADV_SEPERATED;
     }
 
     // Check for touching
@@ -899,7 +899,7 @@ static inline MOTION_ADVANCEMENT_RESULT max_motion_advancement(double current_t,
       printf("e_touching, target_length: %f\n", target_length);
 #endif
       t_out = t1;
-      return COLLIDE;
+      return ADV_COLLIDE;
     }
 
     // Compute 1D root of: f(x) - target_length = 0
@@ -914,7 +914,7 @@ static inline MOTION_ADVANCEMENT_RESULT max_motion_advancement(double current_t,
         t = 0.5 * (a1 + a2); // Bisection
       
       double s = computation.evaluate(t,
-        motion_a, motion_b, a_shape, b_shape);
+        motion_a, motion_b, shape_a, shape_b);
 #ifdef DO_LOGGING
 			printf("    (t:%f, s:%f)\n", t, s);
 #endif
@@ -951,24 +951,24 @@ static inline MOTION_ADVANCEMENT_RESULT max_motion_advancement(double current_t,
 #ifdef DO_LOGGING
   printf("restart\n");
 #endif
-  return RESTART;
+  return ADV_RESTART;
 }
 
 inline bool collide_pairwise_shapes(
   fcl::SplineMotion<double>& motion_a, 
   fcl::SplineMotion<double>& motion_b,
-  const ModelSpaceShape& a_shape,
-  const ModelSpaceShape& b_shape,
+  const ModelSpaceShape& shape_a,
+  const ModelSpaceShape& shape_b,
   double& impact_time, uint& dist_checks, 
   uint safety_maximum_checks, double tolerance,
   double t_min = 0.0,
   double t_max = 1.0)
 {
   auto calc_min_dist = [](
-    const fcl::Transform3d& a_tx,
-    const fcl::Transform3d& b_tx,
-    const ModelSpaceShape& a_shape,
-    const ModelSpaceShape& b_shape,
+    const fcl::Transform3d& tx_a,
+    const fcl::Transform3d& tx_b,
+    const ModelSpaceShape& shape_a,
+    const ModelSpaceShape& shape_b,
     SeperationInfo& seperation_info,
     double& dist,
     double& target_length)
@@ -976,16 +976,16 @@ inline bool collide_pairwise_shapes(
     seperation_info.count_a = 0;
     seperation_info.count_b = 0;
 
-    if (a_shape.shape->getNodeType() == fcl::GEOM_SPHERE && 
-        b_shape.shape->getNodeType() == fcl::GEOM_SPHERE)
+    if (shape_a.shape->getNodeType() == fcl::GEOM_SPHERE && 
+        shape_b.shape->getNodeType() == fcl::GEOM_SPHERE)
     {
       auto sphere_a =
-        std::dynamic_pointer_cast<fcl::Sphered>(a_shape.shape);
+        std::dynamic_pointer_cast<fcl::Sphered>(shape_a.shape);
       auto sphere_b =
-        std::dynamic_pointer_cast<fcl::Sphered>(b_shape.shape);
+        std::dynamic_pointer_cast<fcl::Sphered>(shape_b.shape);
 
-      auto a = a_tx.translation();
-      auto b = b_tx.translation();
+      auto a = tx_a.translation();
+      auto b = tx_b.translation();
 
       target_length = sphere_a->radius + sphere_b->radius;
       
@@ -998,68 +998,69 @@ inline bool collide_pairwise_shapes(
       seperation_info.count_b = 1;
       seperation_info.pointindices_b[0] = 0;
     }
-    else if (a_shape.shape->getNodeType() == fcl::GEOM_SPHERE && 
-        b_shape.shape->getNodeType() == fcl::GEOM_BOX)
+    else if (shape_a.shape->getNodeType() == fcl::GEOM_SPHERE && 
+        shape_b.shape->getNodeType() == fcl::GEOM_BOX)
     {
       auto sphere_a =
-        std::dynamic_pointer_cast<fcl::Sphered>(a_shape.shape);
+        std::dynamic_pointer_cast<fcl::Sphered>(shape_a.shape);
       auto box_b =
-        std::dynamic_pointer_cast<fcl::Boxd>(b_shape.shape);
+        std::dynamic_pointer_cast<fcl::Boxd>(shape_b.shape);
 
       dist = 
-        sphere_box_closest_features(*sphere_a, a_tx, *box_b, b_tx,
+        sphere_box_closest_features(*sphere_a, tx_a, *box_b, tx_b,
           seperation_info);
       
       target_length = sphere_a->radius;
     }
-    else if (a_shape.shape->getNodeType() == fcl::GEOM_BOX && 
-        b_shape.shape->getNodeType() == fcl::GEOM_SPHERE)
+    else if (shape_a.shape->getNodeType() == fcl::GEOM_BOX && 
+        shape_b.shape->getNodeType() == fcl::GEOM_SPHERE)
     {
       auto box_a =
-        std::dynamic_pointer_cast<fcl::Boxd>(a_shape.shape);
+        std::dynamic_pointer_cast<fcl::Boxd>(shape_a.shape);
       auto sphere_b =
-        std::dynamic_pointer_cast<fcl::Sphered>(b_shape.shape);
+        std::dynamic_pointer_cast<fcl::Sphered>(shape_b.shape);
 
       dist = 
-        sphere_box_closest_features(*sphere_b, b_tx, *box_a, a_tx,
+        sphere_box_closest_features(*sphere_b, tx_b, *box_a, tx_a,
           seperation_info);
       
       //swap
       seperation_info.swap();
       target_length = sphere_b->radius;
     }
-    else if (a_shape.shape->getNodeType() == fcl::GEOM_BOX && 
-        b_shape.shape->getNodeType() == fcl::GEOM_BOX)
+    else if (shape_a.shape->getNodeType() == fcl::GEOM_BOX && 
+        shape_b.shape->getNodeType() == fcl::GEOM_BOX)
     {
       auto box_a =
-        std::dynamic_pointer_cast<fcl::Boxd>(a_shape.shape);
+        std::dynamic_pointer_cast<fcl::Boxd>(shape_a.shape);
       auto box_b =
-        std::dynamic_pointer_cast<fcl::Boxd>(b_shape.shape);
+        std::dynamic_pointer_cast<fcl::Boxd>(shape_b.shape);
 
       Eigen::Vector3d a(0, 0, 0), b(0, 0, 0);
       dist = 
-        box_box_closest_features(*box_a, a_tx, *box_b, b_tx,
+        box_box_closest_features(*box_a, tx_a, *box_b, tx_b,
           seperation_info);
       
       target_length = 0.0;
     }
-    //@todo: exception
+    else
+      assert(0 && "Unsupported shape combination type!");
   };
 
-  fcl::Transform3d a_start_tf, b_start_tf;
+  fcl::Transform3d tx_a, tx_b;
   SeperationInfo seperation_info;
 
   motion_a.integrate(t_min);
   motion_b.integrate(t_min);
-  motion_a.getCurrentTransform(a_start_tf);
-  motion_b.getCurrentTransform(b_start_tf);
+  motion_a.getCurrentTransform(tx_a);
+  motion_b.getCurrentTransform(tx_b);
 
-  a_start_tf = a_start_tf * a_shape._transform;
-  b_start_tf = b_start_tf * b_shape._transform;
+  tx_a = tx_a * shape_a._transform;
+  tx_b = tx_b * shape_b._transform;
 
   double target_length = 0.0;
   double dist_to_cover = 0.0;
-  calc_min_dist(a_start_tf, b_start_tf, a_shape, b_shape,
+  calc_min_dist(tx_a, tx_b, shape_a, shape_b,
     seperation_info,
     dist_to_cover, target_length);
   
@@ -1074,26 +1075,25 @@ inline bool collide_pairwise_shapes(
     std::cout << "dist_to_cover: " << dist_to_cover << std::endl;
     rmf_planner_viz::draw::IMDraw::draw_arrow(sf::Vector2f(0, 0), sf::Vector2f(d.x(), d.y()));
 #endif
-    auto collide_result = max_motion_advancement(t, t_max, motion_a, motion_b, a_shape, b_shape, 
+    auto collide_result = max_motion_advancement(t, t_max, motion_a, motion_b, shape_a, shape_b, 
       seperation_info,
       target_length, tolerance, dist_checks, t);
-    if (collide_result == COLLIDE)
+    if (collide_result == ADV_COLLIDE)
       break;
-    else if (collide_result == SEPERATED)
+    else if (collide_result == ADV_SEPERATED)
       return false;
 
 #ifdef DO_LOGGING
     printf("max_motion_advancement returns t: %f\n", t);
 #endif
 
-    fcl::Transform3d a_tf, b_tf;
-    motion_a.getCurrentTransform(a_tf);
-    motion_b.getCurrentTransform(b_tf);
+    motion_a.getCurrentTransform(tx_a);
+    motion_b.getCurrentTransform(tx_b);
 
-    a_tf = a_tf * a_shape._transform;
-    b_tf = b_tf * b_shape._transform;
+    tx_a = tx_a * shape_a._transform;
+    tx_b = tx_b * shape_b._transform;
 
-    calc_min_dist(a_tf, b_tf, a_shape, b_shape, seperation_info,
+    calc_min_dist(tx_a, tx_b, shape_a, shape_b, seperation_info,
       dist_to_cover, target_length);
 
     ++dist_checks;
@@ -1125,14 +1125,14 @@ bool collide_seperable_shapes(
   fcl::SplineMotion<double>& motion_a, 
   fcl::SplineMotion<double>& motion_b,
   uint sweeps,
-  const std::vector<ModelSpaceShape>& a_shapes,
-  const std::vector<ModelSpaceShape>& b_shapes,
+  const std::vector<ModelSpaceShape>& shapes_a,
+  const std::vector<ModelSpaceShape>& shapes_b,
   double& impact_time, uint& iterations, uint safety_maximum_iterations,
   double tolerance)
 {
-  for (const auto& a_shape : a_shapes)
+  for (const auto& shape_a : shapes_a)
   {
-    for (const auto& b_shape : b_shapes)
+    for (const auto& shape_b : shapes_b)
     {
       uint iterations_this_pair = 0;
       double t_per_sweep = 1.0 / (double)sweeps;
@@ -1143,7 +1143,7 @@ bool collide_seperable_shapes(
 
         double toi = 0.0;
         bool collide = collide_pairwise_shapes(
-          motion_a, motion_b, a_shape, b_shape, toi, 
+          motion_a, motion_b, shape_a, shape_b, toi, 
           iterations_this_pair, safety_maximum_iterations,
           tolerance, t_min, t_max);
 
@@ -1206,7 +1206,7 @@ std::vector<Preset> setup_presets()
     p._type = PRESET_SPLINEMOTION;
 
     p.a_shapes.emplace_back(identity, std::make_shared<fcl::Boxd>(1.0, 1.0, 0));
-    //p.b_shapes.emplace_back(identity, std::make_shared<fcl::Boxd>(1.0, 1.0, 0));
+    p.b_shapes.emplace_back(identity, std::make_shared<fcl::Boxd>(1.0, 1.0, 0));
     //p.a_shapes.emplace_back(identity, std::make_shared<fcl::Sphered>(0.5));
     //p.b_shapes.emplace_back(identity, std::make_shared<fcl::Sphered>(0.5));
 
