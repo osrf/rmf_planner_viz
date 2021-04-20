@@ -20,6 +20,8 @@ Test Programs:
 - simple_test: Visual AStar planner debugger
 - test_trajectory, test_spline: spline testing utilities
 - performance_test: Visualizer for [`rmf_performance_tests`](https://github.com/osrf/rmf_performance_tests)
+- performance_test_trajectory: Trajectory Visualizer for [`rmf_performance_tests`](https://github.com/osrf/rmf_performance_tests)
+- test_freespace_planner: Visualizer for [`rmf_freespace_planner`](https://github.com/open-rmf/rmf_freespace_planner)
 
 (Requires fcl 0.6)
 
@@ -48,4 +50,16 @@ To run the performance tests:
 ```asm
 cd {ros2_ws}
 ./src/rmf/rmf_planner_viz/build/performance_test {SCENARIO_NAME}
+```
+
+To run the performance trajectory tests:
+```asm
+cd {ros2_ws}
+./src/rmf/rmf_planner_viz/build/performance_test_trajectory {SCENARIO_NAME} {MAP_NAME} {TIME_OFFSET_IN_MILLISECONDS} {TIME_INCREMENT_IN_MILLISECONDS}
+```
+
+To run the freespace_planner tests:
+```asm
+cd {ros2_ws}
+./src/rmf/rmf_planner_viz/build/test_freespace_planner {SCENARIO_NAME} {MAP_NAME} {TIME_OFFSET_IN_MILLISECONDS} {TIME_INCREMENT_IN_MILLISECONDS}
 ```

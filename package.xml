@@ -14,6 +14,8 @@
   <depend>SFML</depend>
   <depend>imgui_sfml</depend>
   <depend>fcl</depend>
+  <depend>rmf_performance_tests</depend>
+  <depend>rmf_freespace_planner</depend>
 
   <export>
     <build_type>ament_cmake</build_type>

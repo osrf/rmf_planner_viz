@@ -16,6 +16,7 @@ find_package(rmf_traffic REQUIRED)
 find_package(SFML COMPONENTS graphics window system REQUIRED)
 find_package(ImGui-SFML)
 find_package(rmf_performance_tests)
+find_package(rmf_freespace_planner)
 
 include(GNUInstallDirs)
 
@@ -89,6 +90,40 @@ target_link_libraries(
   PUBLIC
     rmf_planning_viz
     ImGui-SFML::ImGui-SFML
+)
+
+add_executable(performance_test_trajectory test/performance_test_trajectory.cpp)
+target_link_libraries(
+  performance_test_trajectory
+  PUBLIC
+    rmf_planning_viz
+    ImGui-SFML::ImGui-SFML
+    rmf_fleet_adapter::rmf_fleet_adapter
+    rmf_performance_tests::rmf_performance_tests
+)
+target_include_directories(
+  performance_test_trajectory
+  PUBLIC
+    rmf_fleet_adapter::rmf_fleet_adapter
+    rmf_performance_tests::rmf_performance_tests
+)
+
+add_executable(test_freespace_planner test/test_freespace_planner.cpp)
+target_link_libraries(
+  test_freespace_planner
+  PUBLIC
+    rmf_planning_viz
+    ImGui-SFML::ImGui-SFML
+    rmf_fleet_adapter::rmf_fleet_adapter
+    rmf_performance_tests::rmf_performance_tests
+    rmf_freespace_planner::rmf_freespace_planner
+)
+target_include_directories(
+  test_freespace_planner
+  PUBLIC
+    rmf_fleet_adapter::rmf_fleet_adapter
+    rmf_performance_tests::rmf_performance_tests
+    rmf_freespace_planner::rmf_freespace_planner
 )
 
 add_executable(test_spline
