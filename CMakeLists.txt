@@ -19,7 +19,7 @@ find_package(ImGui-SFML)
 include(GNUInstallDirs)
 
 add_library(
-  rmf_planning_viz
+  rmf_planner_viz
     src/rmf_planner_viz/draw/ColorPicker.cpp
     src/rmf_planner_viz/draw/Fit.cpp
     src/rmf_planner_viz/draw/Graph.cpp
@@ -30,14 +30,14 @@ add_library(
 )
 
 target_link_libraries(
-  rmf_planning_viz
+  rmf_planner_viz
   PUBLIC
     rmf_traffic::rmf_traffic
     sfml-graphics
 )
 
 target_include_directories(
-  rmf_planning_viz
+  rmf_planner_viz
   PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
@@ -47,7 +47,7 @@ add_executable(simple_test test/simple_test.cpp test/planner_debug.cpp)
 target_link_libraries(
   simple_test
   PUBLIC
-    rmf_planning_viz
+    rmf_planner_viz
     ImGui-SFML::ImGui-SFML
     rmf_fleet_adapter::rmf_fleet_adapter
 )
@@ -56,7 +56,7 @@ add_executable(test_trajectory test/test_trajectory.cpp)
 target_link_libraries(
   test_trajectory
   PUBLIC
-    rmf_planning_viz
+    rmf_planner_viz
     ImGui-SFML::ImGui-SFML
 )
 
@@ -67,7 +67,7 @@ add_executable(test_spline
 target_link_libraries(
   test_spline
   PUBLIC
-    rmf_planning_viz
+    rmf_planner_viz
     ImGui-SFML::ImGui-SFML
 )
 
@@ -85,7 +85,7 @@ if(fcl_FOUND)
   target_link_libraries(
     test_fcl_spline
     PUBLIC
-      rmf_planning_viz
+      rmf_planner_viz
       ImGui-SFML::ImGui-SFML
       fcl
   )
@@ -98,11 +98,15 @@ if(fcl_FOUND)
   target_link_libraries(
     test_fcl_spline_offset
     PUBLIC
-      rmf_planning_viz
+      rmf_planner_viz
       ImGui-SFML::ImGui-SFML
       fcl
   )
 endif()
+
+ament_export_targets(rmf_planner_viz HAS_LIBRARY_TARGET)
+ament_export_dependencies(rmf_traffic rmf_fleet_adapter ImGui-SFML)
+
 
 ## copy font files
 install(
@@ -110,3 +114,17 @@ install(
   DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/fonts/
 )
 
+install(
+  DIRECTORY include/
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
+install(
+  TARGETS rmf_planner_viz
+  EXPORT rmf_planner_viz
+  RUNTIME DESTINATION lib/rmf_planner_viz
+  LIBRARY DESTINATION lib
+  ARCHIVE DESTINATION lib
+)
+
+ament_package(CONFIG_EXTRAS cmake/get_sfml_components.cmake)

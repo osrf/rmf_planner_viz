@@ -20,7 +20,7 @@
 #define RMF_PLANNER_VIZ__DRAW__PLANNERDEBUG_HPP
 
 #include <rmf_traffic/agv/Planner.hpp>
-#include <rmf_traffic/agv/debug/Planner.hpp>
+#include <rmf_traffic/agv/debug/debug_Planner.hpp>
 
 #include <rmf_planner_viz/draw/Trajectory.hpp>
 

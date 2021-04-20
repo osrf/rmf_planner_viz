@@ -24,7 +24,7 @@
 
 #include <rmf_traffic/schedule/Database.hpp>
 #include <rmf_traffic/agv/Planner.hpp>
-#include <rmf_traffic/agv/debug/Planner.hpp>
+#include <rmf_traffic/agv/debug/debug_Planner.hpp>
 
 #include "imgui-SFML.h"
 
@@ -274,7 +274,7 @@ bool do_planner_debug(
     if (selected_node->start_set_index)
       ImGui::Text("start_set_index: %lu", *selected_node->start_set_index);
 
-    const rmf_traffic::Route& route = selected_node->route_from_parent;
+    const rmf_traffic::Route& route = selected_node->route_from_parent.back();
     if (route.trajectory().start_time())
       ImGui::Text("Node Traj start time: %ld",  route.trajectory().start_time()->time_since_epoch().count());
     if (route.trajectory().finish_time())
@@ -292,10 +292,10 @@ bool do_planner_debug(
     while (parent_node)
     {
       auto& route_p = parent_node->route_from_parent;
-      auto route_start_time = route_p.trajectory().start_time();
+      auto route_start_time = route_p.back().trajectory().start_time();
       if (route_start_time && start_timestamp > *route_start_time)
         start_timestamp = *route_start_time;
-      auto route_fin_time = route_p.trajectory().finish_time();
+      auto route_fin_time = route_p.back().trajectory().finish_time();
       if (route_fin_time && finish_timestamp < *route_fin_time)
         finish_timestamp = *route_fin_time;
 
@@ -324,7 +324,7 @@ bool do_planner_debug(
       std::vector<rmf_planner_viz::draw::Trajectory>& to_render,
       rmf_traffic::agv::Planner::Debug::ConstNodePtr node)
     {
-      const rmf_traffic::Route& route = node->route_from_parent;
+      const rmf_traffic::Route& route = node->route_from_parent.back();
       const auto& traj = route.trajectory();
       auto trajectory = rmf_planner_viz::draw::Trajectory(traj,
         profile, trajectory_start_time, std::nullopt, sf::Color::Green, { 0.0, 0.0 }, 2.0f, finish_timestamp);
