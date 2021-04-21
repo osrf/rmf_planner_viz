@@ -37,7 +37,11 @@ class Graph : public sf::Drawable
 {
 public:
 
-  Graph(const rmf_traffic::agv::Graph& graph, float lane_width, const sf::Font& font);
+  Graph(
+    const rmf_traffic::agv::Graph& graph,
+    float lane_width,
+    const sf::Font& font,
+    sf::Color lane_color = sf::Color::White);
 
   bool choose_map(const std::string& name);
 

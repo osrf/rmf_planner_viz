@@ -54,9 +54,10 @@ public:
     std::vector<std::size_t> waypoint_indices;
   };
 
-  static const sf::Color LaneEntryColor;
-  static const sf::Color LaneExitColor;
-  static const sf::Color WaypointColor;
+  sf::Color LaneEntryColor = sf::Color::White;
+  sf::Color LaneExitColor = sf::Color(255/3, 255/3, 255/3);
+//  sf::Color WaypointColor = sf::Color::Blue;
+  sf::Color WaypointColor = sf::Color::Black;
 
   static Eigen::Vector2f inf()
   {
@@ -81,9 +82,11 @@ public:
   rmf_utils::optional<Pick> selected;
 
   Implementation(
-      const rmf_traffic::agv::Graph& graph,
-      const float lane_width,
-      const sf::Font& font)
+    const rmf_traffic::agv::Graph& graph,
+    const float lane_width,
+    const sf::Font& font,
+    const sf::Color lane_color)
+  : LaneEntryColor(lane_color)
   {
     this->lane_width = lane_width;
     std::unordered_map<std::size_t, std::unordered_set<std::size_t>> used_lanes;
@@ -318,7 +321,7 @@ public:
 
     float center_spacing = 0.0625f;
     sf::Vector2 forward_vec = diff_norm * (0.5f + center_spacing);
-    
+
     auto diff_perp = sf::Vector2(-diff_norm.y, diff_norm.x);
     float side = 0.25f;
 
@@ -333,16 +336,14 @@ public:
   };
 };
 
-const sf::Color Graph::Implementation::LaneEntryColor = sf::Color::White;
-const sf::Color Graph::Implementation::LaneExitColor = sf::Color(255/3, 255/3, 255/3);
-const sf::Color Graph::Implementation::WaypointColor = sf::Color::Blue;
-
 //==============================================================================
 Graph::Graph(
     const rmf_traffic::agv::Graph& graph,
     const float lane_width,
-    const sf::Font& font)
-  : _pimpl(rmf_utils::make_impl<Implementation>(graph, lane_width, font))
+    const sf::Font& font,
+    const sf::Color lane_color)
+  : _pimpl(rmf_utils::make_impl<Implementation>(
+             graph, lane_width, font, lane_color))
 {
   // Do nothing
 }
@@ -489,6 +490,7 @@ void Graph::draw(sf::RenderTarget& target, sf::RenderStates states) const
     target.draw(s.second, states);
 }
 
+//==============================================================================
 void Graph::set_text_size(uint sz)
 {
   for (auto& iter : _pimpl->data)
@@ -519,6 +521,7 @@ void Graph::set_text_size(uint sz)
   }
 }
 
+//==============================================================================
 std::vector<std::string> Graph::get_map_names()
 {
   std::vector<std::string> names;

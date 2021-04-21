@@ -100,13 +100,36 @@ int main(int argc, char* argv[])
   const auto get_wp =
       [&](const rmf_traffic::agv::Graph& graph, const std::string& name)
       {
-        std::cout << "GETTING WAYPOINT " << name << std::endl;
         return graph.find_waypoint(name)->index();
       };
 
   const auto start_time = std::chrono::steady_clock::now();
 
   const auto database = std::make_shared<rmf_traffic::schedule::Database>();
+
+  rmf_planner_viz::draw::Graph graph_drawable(
+      plan_robot->second.graph(), 0.5, font, sf::Color::Black);
+  graph_drawable.set_text_size(0);
+  std::vector<std::string> map_names = graph_drawable.get_map_names();
+  const std::string chosen_map = argv[2];
+
+  const auto obstacle_validator =
+      rmf_traffic::agv::ScheduleRouteValidator::make(
+          database, NotObstacleID, plan_robot->second.vehicle_traits().profile());
+
+  rmf_traffic::agv::Planner planner_0(
+      plan_robot->second,
+      rmf_traffic::agv::Planner::Options(obstacle_validator, 4s));
+
+  auto traits = planner_0.get_configuration().vehicle_traits();
+  auto plan_participant = rmf_traffic::schedule::make_participant(
+      rmf_traffic::schedule::ParticipantDescription{
+          "participant_0",
+          "test_trajectory",
+          rmf_traffic::schedule::ParticipantDescription::Rx::Responsive,
+          traits.profile()
+      },
+      database);
 
   std::vector<rmf_traffic::schedule::Participant> obstacles;
 
@@ -159,30 +182,6 @@ int main(int argc, char* argv[])
   }
 
   const auto& plan = scenario.plan;
-
-  rmf_planner_viz::draw::Graph graph_drawable(
-      plan_robot->second.graph(), 0.5, font);
-  std::vector<std::string> map_names = graph_drawable.get_map_names();
-  const std::string chosen_map = argv[2];
-  using namespace std::chrono_literals;
-
-  const auto obstacle_validator =
-      rmf_traffic::agv::ScheduleRouteValidator::make(
-          database, NotObstacleID, plan_robot->second.vehicle_traits().profile());
-
-  rmf_traffic::agv::Planner planner_0(
-      plan_robot->second,
-      rmf_traffic::agv::Planner::Options(obstacle_validator, 4s));
-
-  auto traits = planner_0.get_configuration().vehicle_traits();
-  auto plan_participant = rmf_traffic::schedule::make_participant(
-      rmf_traffic::schedule::ParticipantDescription{
-          "participant_0",
-          "test_trajectory",
-          rmf_traffic::schedule::ParticipantDescription::Rx::Responsive,
-          traits.profile()
-      },
-      database);
   /// Setup participants
 
   // set plans for the participants
@@ -198,7 +197,7 @@ int main(int argc, char* argv[])
       plan_robot->second.graph(), plan.goal));
 
   rmf_planner_viz::draw::Schedule schedule_drawable(
-        database, 0.5, chosen_map, start_time + 0s);
+        database, 0.2, chosen_map, start_time + 0s);
 
   plan_participant.set(planner_0.plan(starts, goal)->get_itinerary());
 
@@ -236,12 +235,13 @@ int main(int argc, char* argv[])
 
     ImGui::SFML::Update(app_window, deltaClock.restart());
 
-    app_window.clear();
+    app_window.clear(sf::Color::White);
 
     const auto now = std::chrono::steady_clock::now();
     const rmf_traffic::Duration elapsed_time =
-      std::chrono::duration_cast<rmf_traffic::Duration>(
-        (now - initial_time)*real_time_factor);
+//      std::chrono::duration_cast<rmf_traffic::Duration>(
+//        (now - initial_time)*real_time_factor);
+        0s;
     schedule_drawable.timespan(initial_time + elapsed_time);
 
     sf::RenderStates states;
