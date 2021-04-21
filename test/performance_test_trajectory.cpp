@@ -39,21 +39,44 @@ const std::size_t NotObstacleID = std::numeric_limits<std::size_t>::max();
 
 int main(int argc, char* argv[])
 {
+  using namespace std::chrono_literals;
+
   sf::Font font;
   if (!font.loadFromFile("./build/rmf_planner_viz/fonts/OpenSans-Bold.ttf"))
   {
     std::cout <<
               "Failed to load font. Make sure you run the executable from the colcon directory"
               << std::endl;
-    return -1;
+    return 1;
   }
 
   if (argc < 2)
   {
     std::cout << "Please provide scenario file name" << std::endl;
-    return 0;
+    return 1;
   }
 
+  if (argc < 3)
+  {
+    std::cout << "Please provide a map name" << std::endl;
+    return 1;
+  }
+
+  const auto real_time_factor = [&]() -> double
+  {
+    if (argc < 4)
+      return 1.0;
+
+    return std::stod(argv[3]);
+  }();
+
+  const auto initial_time_offset = [&]() -> rmf_traffic::Duration
+  {
+    if (argc < 5)
+      return 0s;
+
+    return std::chrono::milliseconds(std::stoi(argv[4]));
+  }();
 
   rmf_performance_tests::scenario::Description scenario;
   try
@@ -66,8 +89,6 @@ int main(int argc, char* argv[])
     return 0;
   }
 
-  using namespace std::chrono_literals;
-
   const auto& plan_robot = scenario.robots.find(scenario.plan.robot);
   if (plan_robot == scenario.robots.end())
   {
@@ -79,6 +100,7 @@ int main(int argc, char* argv[])
   const auto get_wp =
       [&](const rmf_traffic::agv::Graph& graph, const std::string& name)
       {
+        std::cout << "GETTING WAYPOINT " << name << std::endl;
         return graph.find_waypoint(name)->index();
       };
 
@@ -138,12 +160,10 @@ int main(int argc, char* argv[])
 
   const auto& plan = scenario.plan;
 
-  rmf_planner_viz::draw::Graph graph_0_drawable(
-      plan_robot->second.graph(), 1.0, font);
-  std::vector<std::string> map_names = graph_0_drawable.get_map_names();
-  std::string chosen_map = argv[2];
-//  if (graph_0_drawable.current_map())
-//    chosen_map = *graph_0_drawable.current_map();
+  rmf_planner_viz::draw::Graph graph_drawable(
+      plan_robot->second.graph(), 0.5, font);
+  std::vector<std::string> map_names = graph_drawable.get_map_names();
+  const std::string chosen_map = argv[2];
   using namespace std::chrono_literals;
 
   const auto obstacle_validator =
@@ -152,7 +172,7 @@ int main(int argc, char* argv[])
 
   rmf_traffic::agv::Planner planner_0(
       plan_robot->second,
-      rmf_traffic::agv::Planner::Options(obstacle_validator));
+      rmf_traffic::agv::Planner::Options(obstacle_validator, 4s));
 
   auto traits = planner_0.get_configuration().vehicle_traits();
   auto plan_participant = rmf_traffic::schedule::make_participant(
@@ -178,7 +198,7 @@ int main(int argc, char* argv[])
       plan_robot->second.graph(), plan.goal));
 
   rmf_planner_viz::draw::Schedule schedule_drawable(
-        database, 0.25, chosen_map, start_time + 0s);
+        database, 0.5, chosen_map, start_time + 0s);
 
   plan_participant.set(planner_0.plan(starts, goal)->get_itinerary());
 
@@ -189,21 +209,14 @@ int main(int argc, char* argv[])
 
   app_window.resetGLStates();
 
-  const auto bounds = schedule_drawable.bounds();
-
-  rmf_planner_viz::draw::Fit fit({bounds}, 0.02);
-  std::cout << "initial bounds:\n"
-            << " -- min: " << graph_0_drawable.bounds().min.transpose()
-            << "\n -- max: " << graph_0_drawable.bounds().max.transpose() << std::endl;
+  rmf_planner_viz::draw::Fit fit({schedule_drawable.bounds(), graph_drawable.bounds()}, 0.02);
   ImGui::SFML::Init(app_window);
 
-  auto current_time = start_time;
-  current_time += std::chrono::milliseconds(std::stoi(argv[3]));
+  const auto initial_time = start_time + initial_time_offset;
   sf::Clock deltaClock;
 
   while (app_window.isOpen())
   {
-    current_time += std::chrono::milliseconds(std::stoi(argv[4]));
     sf::Event event;
     while (app_window.pollEvent(event))
     {
@@ -225,10 +238,15 @@ int main(int argc, char* argv[])
 
     app_window.clear();
 
-    schedule_drawable.timespan(current_time);
+    const auto now = std::chrono::steady_clock::now();
+    const rmf_traffic::Duration elapsed_time =
+      std::chrono::duration_cast<rmf_traffic::Duration>(
+        (now - initial_time)*real_time_factor);
+    schedule_drawable.timespan(initial_time + elapsed_time);
 
     sf::RenderStates states;
     fit.apply_transform(states.transform, app_window.getSize());
+    app_window.draw(graph_drawable, states);
     app_window.draw(schedule_drawable, states);
 
     ImGui::SFML::Render();
