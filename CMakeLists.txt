@@ -68,6 +68,19 @@ target_link_libraries(
     ImGui-SFML::ImGui-SFML
 )
 
+add_executable(test_rotation_failure test/test_rotation_failure.cpp)
+target_link_libraries(
+  test_rotation_failure
+  PUBLIC
+    rmf_planning_viz
+    ImGui-SFML::ImGui-SFML
+)
+
+target_compile_definitions(test_rotation_failure
+  PRIVATE
+    "RESOURCES_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/regress_DetectConflict_fail/\""
+)
+
 add_executable(test_spline
   test/test_spline.cpp
   )
