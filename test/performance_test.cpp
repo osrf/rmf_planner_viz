@@ -77,7 +77,7 @@ int main(int argc, char* argv[])
       return graph.find_waypoint(name)->index();
     };
 
-  const auto start_time = std::chrono::steady_clock::now();
+  const auto start_time = rmf_traffic::Time(rmf_traffic::Duration(0));
 
   // We'll make some "obstacles" in the environment by planning routes between
   // various waypoints.
@@ -85,7 +85,7 @@ int main(int argc, char* argv[])
   const auto database = std::make_shared<rmf_traffic::schedule::Database>();
   std::vector<rmf_traffic::schedule::Participant> obstacles;
 
-  for (const auto& obstacle : scenario.obstacles)
+  for (const auto& obstacle : scenario.obstacle_plans)
   {
     const auto& robot = scenario.robots.find(obstacle.robot);
 
@@ -131,6 +131,17 @@ int main(int argc, char* argv[])
         )
       );
     }
+  }
+
+  for (const auto& obstacle : scenario.obstacle_routes)
+  {
+    const auto& robot = scenario.robots.at(obstacle.robot);
+
+    obstacles.emplace_back(
+      rmf_performance_tests::add_obstacle(
+        database,
+        robot.vehicle_traits().profile(),
+        obstacle.route));
   }
 
   const auto& plan = scenario.plan;

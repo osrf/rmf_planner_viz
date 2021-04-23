@@ -88,7 +88,7 @@ int main(int argc, char* argv[])
 
   std::vector<rmf_traffic::schedule::Participant> obstacles;
 
-  for (const auto& obstacle : scenario.obstacles)
+  for (const auto& obstacle : scenario.obstacle_plans)
   {
     const auto& robot = scenario.robots.find(obstacle.robot);
 
@@ -134,6 +134,17 @@ int main(int argc, char* argv[])
           )
       );
     }
+  }
+
+  for (const auto& obstacle : scenario.obstacle_routes)
+  {
+    const auto& robot = scenario.robots.at(obstacle.robot);
+
+    obstacles.emplace_back(
+        rmf_performance_tests::add_obstacle(
+            database,
+            robot.vehicle_traits().profile(),
+            obstacle.route));
   }
 
   const auto& plan = scenario.plan;
