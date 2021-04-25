@@ -82,7 +82,7 @@ int main(int argc, char* argv[])
         return graph.find_waypoint(name)->index();
       };
 
-  const auto start_time = std::chrono::steady_clock::now();
+  const auto start_time = rmf_traffic::Time(rmf_traffic::Duration(0));
 
   const auto database = std::make_shared<rmf_traffic::schedule::Database>();
 
@@ -153,8 +153,8 @@ int main(int argc, char* argv[])
       plan_robot->second.graph(), 1.0, font);
   std::vector<std::string> map_names = graph_0_drawable.get_map_names();
   std::string chosen_map = argv[2];
-//  if (graph_0_drawable.current_map())
-//    chosen_map = *graph_0_drawable.current_map();
+  if (graph_0_drawable.current_map())
+    chosen_map = *graph_0_drawable.current_map();
   using namespace std::chrono_literals;
 
   const auto obstacle_validator =
@@ -234,12 +234,15 @@ int main(int argc, char* argv[])
 
     ImGui::SFML::Update(app_window, deltaClock.restart());
 
+    graph_0_drawable.choose_map(chosen_map);
+
     app_window.clear();
 
     schedule_drawable.timespan(current_time);
 
     sf::RenderStates states;
     fit.apply_transform(states.transform, app_window.getSize());
+    app_window.draw(graph_0_drawable, states);
     app_window.draw(schedule_drawable, states);
 
     ImGui::SFML::Render();
