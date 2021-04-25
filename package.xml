@@ -16,6 +16,7 @@
   <depend>fcl</depend>
   <depend>rmf_performance_tests</depend>
   <depend>rmf_freespace_planner</depend>
+  <depend>rmf_probabilistic_road_map</depend>
 
   <export>
     <build_type>ament_cmake</build_type>
