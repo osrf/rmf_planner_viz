@@ -83,7 +83,7 @@ int main(int argc, char* argv[])
         return graph.find_waypoint(name)->index();
       };
 
-  const auto start_time = std::chrono::steady_clock::now();
+  const auto start_time = rmf_traffic::Time(rmf_traffic::Duration(0));
 
   const auto database = std::make_shared<rmf_traffic::schedule::Database>();
 
