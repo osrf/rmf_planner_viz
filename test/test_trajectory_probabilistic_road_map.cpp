@@ -78,9 +78,7 @@ int main(int argc, char* argv[])
   const auto get_wp =
     [&](const rmf_traffic::agv::Graph& graph, const std::string& name)
     {
-      const auto& wp = graph.find_waypoint(name);
-      std::cout << wp->get_location().transpose() << std::endl;
-      return wp->index();
+      return graph.find_waypoint(name)->index();
     };
 
   const auto start_time = rmf_traffic::Time(rmf_traffic::Duration(0));
@@ -192,14 +190,65 @@ int main(int argc, char* argv[])
 
   const auto& routes = planner_plan->get_itinerary();
 
-  rmf_probabilistic_road_map::ProbabilisticRoadMap probabilistic_road_map(15, 3,
-    100.0,
-    plan_robot->second.vehicle_traits().profile().footprint()->get_characteristic_length());
-  probabilistic_road_map.set_obstacles(static_obstacles);
+  const auto& start_timing = std::chrono::steady_clock::now();
+  std::vector<rmf_traffic::Route> planned_routes;
+  std::vector<rmf_traffic::agv::Graph> graphs;
+  rmf_traffic::agv::Planner::Options options(obstacle_validator);
+  options.saturation_limit(5000);
+  for (const auto& route : routes)
+  {
+    for (std::size_t i = 0; i < route.trajectory().size() - 1; ++i)
+    {
+      if ((route.trajectory()[i].position() -
+          route.trajectory()[i + 1].position()).norm() < 1)
+      {
+        continue;
+      }
+      if (route.trajectory()[i].position().x() ==
+          route.trajectory()[i + 1].position().x() &&
+          route.trajectory()[i].position().y() ==
+              route.trajectory()[i + 1].position().y())
+      {
+        continue;
+      }
 
-  auto start_timing = std::chrono::steady_clock::now();
-  const auto& graphs = probabilistic_road_map.make_graph(routes);
-  const auto& graph = probabilistic_road_map.combine_graphs(graphs);
+      rmf_probabilistic_road_map::ProbabilisticRoadMap probabilistic_road_map(
+        0,
+        3,
+        1000.0,
+        plan_robot->second.vehicle_traits().profile().footprint()->get_characteristic_length(),
+        routes.at(0).map());
+      probabilistic_road_map.set_obstacles(static_obstacles);
+
+      auto graph1 = probabilistic_road_map.create_graph(route.trajectory()[i], route.trajectory()[i + 1]);
+      rmf_traffic::agv::Planner planner_1(
+          {graph1, plan_robot->second.vehicle_traits()},
+          options);
+      starts = {{route.trajectory()[i].time(), 0, route.trajectory()[i].position().z()}};
+      goal = graph1.num_waypoints() - 1;
+
+      auto result = planner_1.plan(starts, goal);
+      std::size_t index = 0;
+
+      while (!result.success()) {
+        graph1 = probabilistic_road_map.expand_graph(graph1, route.trajectory()[i], route.trajectory()[i + 1], 5);
+        rmf_traffic::agv::Planner planner_2(
+          {graph1, plan_robot->second.vehicle_traits()},
+          options);
+        result = planner_2.plan(starts, goal);
+      }
+      if (result.success()) {
+        planned_routes.insert(planned_routes.end(), result->get_itinerary().begin(), result->get_itinerary().end());
+      } else {
+        std::cout << "not success\n";
+      }
+      graphs.emplace_back(graph1);
+    }
+  }
+
+  plan_participant.set(planned_routes);
+
+  const auto& combined_graph = rmf_probabilistic_road_map::ProbabilisticRoadMap::combine_graphs(graphs);
   auto end_timing = std::chrono::steady_clock::now();
 
   std::cout << "-------------------------" << std::endl;
@@ -208,31 +257,14 @@ int main(int argc, char* argv[])
       end_timing - start_timing).count() / 1000.0 << "s" << std::endl;
   std::cout << "-------------------------" << std::endl;
 
-  rmf_planner_viz::draw::Graph graph_0_drawable(graph, 1.0, font);
+  rmf_planner_viz::draw::Graph graph_0_drawable(combined_graph, 0.5, font);
   std::vector<std::string> map_names = graph_0_drawable.get_map_names();
   std::string chosen_map = argv[2];
   if (graph_0_drawable.current_map())
     chosen_map = *graph_0_drawable.current_map();
 
-  rmf_traffic::agv::Planner planner_1(
-    {graph, plan_robot->second.vehicle_traits()},
-    rmf_traffic::agv::Planner::Options(nullptr));
-
-  starts = {{start_time, 0, 0}};
-  goal = graph.num_waypoints() - 1;
-
   rmf_planner_viz::draw::Schedule schedule_drawable(
     database, 0.25, chosen_map, start_time + 0s);
-
-  start_timing = std::chrono::steady_clock::now();
-  plan_participant.set(planner_1.plan(starts, goal)->get_itinerary());
-  end_timing = std::chrono::steady_clock::now();
-
-  std::cout << "-------------------------" << std::endl;
-  std::cout << "Time taken for make_plan " <<
-    std::chrono::duration_cast<std::chrono::milliseconds>(
-      end_timing - start_timing).count() / 1000.0 << "s" << std::endl;
-  std::cout << "-------------------------" << std::endl;
 
   sf::RenderWindow app_window(
     sf::VideoMode(1250, 1028),

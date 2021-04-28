@@ -180,7 +180,8 @@ int main(int argc, char* argv[])
 
   rmf_probabilistic_road_map::ProbabilisticRoadMap probabilistic_road_map(15, 2,
     100.0,
-    plan_robot->second.vehicle_traits().profile().footprint()->get_characteristic_length());
+    plan_robot->second.vehicle_traits().profile().footprint()->get_characteristic_length(),
+    routes.at(0).map());
   probabilistic_road_map.set_obstacles(static_obstacles);
   const auto& graphs = probabilistic_road_map.make_graph(routes);
   const auto& graph = probabilistic_road_map.combine_graphs(graphs);
