@@ -264,6 +264,7 @@ int main(int argc, char* argv[])
 
     sf::RenderStates states;
     fit.apply_transform(states.transform, app_window.getSize());
+    app_window.draw(graph_0_drawable, states);
     app_window.draw(schedule_drawable, states);
 
     ImGui::SFML::Render(app_window);
