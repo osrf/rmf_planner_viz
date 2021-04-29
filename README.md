@@ -22,6 +22,9 @@ Test Programs:
 - performance_test: Visualizer for [`rmf_performance_tests`](https://github.com/osrf/rmf_performance_tests)
 - performance_test_trajectory: Trajectory Visualizer for [`rmf_performance_tests`](https://github.com/osrf/rmf_performance_tests)
 - test_freespace_planner: Visualizer for [`rmf_freespace_planner`](https://github.com/open-rmf/rmf_freespace_planner)
+- test_probabilistic_road_map: Visualizer for [`rmf_probabilistic_road_map`](https://github.com/shiveshkhaitan/rmf_probabilistic_road_map)
+- test_trajectory_probabilistic_road_map: Trajectory Visualizer for [`rmf_probabilistic_road_map`](https://github.com/shiveshkhaitan/rmf_probabilistic_road_map)
+
 
 (Requires fcl 0.6)
 
@@ -62,4 +65,15 @@ To run the freespace_planner tests:
 ```asm
 cd {ros2_ws}
 ./src/rmf/rmf_planner_viz/build/test_freespace_planner {SCENARIO_NAME} {MAP_NAME} {TIME_OFFSET_IN_MILLISECONDS} {TIME_INCREMENT_IN_MILLISECONDS}
+```
+
+To run the probabilistic_road_map tests:
+```asm
+cd {ros2_ws}
+./src/rmf/rmf_planner_viz/build/test_probabilistic_road_map {SCENARIO_NAME} {MAP_NAME} {TIME_OFFSET_IN_MILLISECONDS} {TIME_INCREMENT_IN_MILLISECONDS}
+```
+or
+```asm
+cd {ros2_ws}
+./src/rmf/rmf_planner_viz/build/test_trajectory_probabilistic_road_map {SCENARIO_NAME} {MAP_NAME} {TIME_OFFSET_IN_MILLISECONDS} {TIME_INCREMENT_IN_MILLISECONDS}
 ```
