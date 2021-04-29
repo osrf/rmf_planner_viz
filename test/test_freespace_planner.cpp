@@ -158,10 +158,6 @@ int main(int argc, char* argv[])
 //    chosen_map = *graph_0_drawable.current_map();
   using namespace std::chrono_literals;
 
-  const auto obstacle_validator =
-      rmf_traffic::agv::ScheduleRouteValidator::make(
-          database, NotObstacleID, plan_robot->second.vehicle_traits().profile());
-
   rmf_traffic::agv::Planner planner_0(
       plan_robot->second,
       rmf_traffic::agv::Planner::Options(nullptr));
@@ -176,6 +172,10 @@ int main(int argc, char* argv[])
       },
       database);
   /// Setup participants
+
+  const auto obstacle_validator =
+    rmf_traffic::agv::ScheduleRouteValidator::make(
+      database, plan_participant.id(), plan_robot->second.vehicle_traits().profile());
 
   // set plans for the participants
   using namespace std::chrono_literals;
@@ -194,8 +194,11 @@ int main(int argc, char* argv[])
 
 
   auto posq =
-      std::make_shared<rmf_freespace_planner::kinodynamic_rrt_star::Posq>(
-          obstacle_validator, 0.1);
+    std::make_shared<rmf_freespace_planner::kinodynamic_rrt_star::Posq>(
+      obstacle_validator,
+      database,
+      std::unordered_set<rmf_traffic::schedule::ParticipantId>({plan_participant.id()}),
+      0.1);
 
   auto start_timing = std::chrono::steady_clock::now();
   auto planner_routes = planner_0.plan(starts, goal)->get_itinerary();
