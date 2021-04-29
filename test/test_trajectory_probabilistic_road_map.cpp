@@ -17,16 +17,14 @@
 
 #include <SFML/Graphics.hpp>
 
+#include <rmf_planner_viz/draw/Graph.hpp>
 #include <rmf_planner_viz/draw/Schedule.hpp>
-
-#include <rmf_traffic/geometry/Circle.hpp>
-#include <rmf_traffic/schedule/Database.hpp>
 
 #include <rmf_fleet_adapter/agv/parse_graph.hpp>
 #include <rmf_performance_tests/rmf_performance_tests.hpp>
 #include <rmf_performance_tests/Scenario.hpp>
-#include <rmf_planner_viz/draw/Graph.hpp>
 #include <rmf_probabilistic_road_map/rmf_probabilistic_road_map.hpp>
+#include <rmf_traffic/schedule/Database.hpp>
 
 #include <Eigen/Geometry>
 
@@ -153,9 +151,19 @@ int main(int argc, char* argv[])
 
   const auto& plan = scenario.plan;
 
+  auto plan_participant = rmf_traffic::schedule::make_participant(
+    rmf_traffic::schedule::ParticipantDescription{
+      "participant_0",
+      "test_trajectory",
+      rmf_traffic::schedule::ParticipantDescription::Rx::Responsive,
+      plan_robot->second.vehicle_traits().profile()
+    },
+    database);
+
   const auto obstacle_validator =
     rmf_traffic::agv::ScheduleRouteValidator::make(
-    database, NotObstacleID, plan_robot->second.vehicle_traits().profile());
+    database, plan_participant.id(),
+    plan_robot->second.vehicle_traits().profile());
 
   rmf_traffic::agv::Planner planner_0(
     plan_robot->second,
@@ -163,15 +171,6 @@ int main(int argc, char* argv[])
 
   using namespace std::chrono_literals;
 
-  auto traits = planner_0.get_configuration().vehicle_traits();
-  auto plan_participant = rmf_traffic::schedule::make_participant(
-    rmf_traffic::schedule::ParticipantDescription{
-      "participant_0",
-      "test_trajectory",
-      rmf_traffic::schedule::ParticipantDescription::Rx::Responsive,
-      traits.profile()
-    },
-    database);
   /// Setup participants
 
   // set plans for the participants
@@ -200,46 +199,58 @@ int main(int argc, char* argv[])
     for (std::size_t i = 0; i < route.trajectory().size() - 1; ++i)
     {
       if ((route.trajectory()[i].position() -
-          route.trajectory()[i + 1].position()).norm() < 1)
+        route.trajectory()[i + 1].position()).norm() < 1)
       {
         continue;
       }
       if (route.trajectory()[i].position().x() ==
-          route.trajectory()[i + 1].position().x() &&
-          route.trajectory()[i].position().y() ==
-              route.trajectory()[i + 1].position().y())
+        route.trajectory()[i + 1].position().x() &&
+        route.trajectory()[i].position().y() ==
+        route.trajectory()[i + 1].position().y())
       {
         continue;
       }
 
       rmf_probabilistic_road_map::ProbabilisticRoadMap probabilistic_road_map(
-        0,
         3,
         1000.0,
         plan_robot->second.vehicle_traits().profile().footprint()->get_characteristic_length(),
+        database,
+        std::unordered_set<rmf_traffic::schedule::ParticipantId>(
+          {plan_participant.id()}),
         routes.at(0).map());
       probabilistic_road_map.set_obstacles(static_obstacles);
 
-      auto graph1 = probabilistic_road_map.create_graph(route.trajectory()[i], route.trajectory()[i + 1]);
+      auto graph1 = probabilistic_road_map.create_graph(
+        route.trajectory()[i], route.trajectory()[i + 1]);
       rmf_traffic::agv::Planner planner_1(
-          {graph1, plan_robot->second.vehicle_traits()},
-          options);
-      starts = {{route.trajectory()[i].time(), 0, route.trajectory()[i].position().z()}};
+        {graph1, plan_robot->second.vehicle_traits()},
+        options);
+      starts =
+      {{route.trajectory()[i].time(), 0,
+        route.trajectory()[i].position().z()}};
       goal = graph1.num_waypoints() - 1;
 
       auto result = planner_1.plan(starts, goal);
       std::size_t index = 0;
 
-      while (!result.success()) {
-        graph1 = probabilistic_road_map.expand_graph(graph1, route.trajectory()[i], route.trajectory()[i + 1], 5);
+      while (!result.success())
+      {
+        graph1 =
+          probabilistic_road_map.expand_graph(graph1,
+            route.trajectory()[i], route.trajectory()[i + 1], 3);
         rmf_traffic::agv::Planner planner_2(
           {graph1, plan_robot->second.vehicle_traits()},
           options);
         result = planner_2.plan(starts, goal);
       }
-      if (result.success()) {
-        planned_routes.insert(planned_routes.end(), result->get_itinerary().begin(), result->get_itinerary().end());
-      } else {
+      if (result.success())
+      {
+        planned_routes.insert(planned_routes.end(),
+          result->get_itinerary().begin(), result->get_itinerary().end());
+      }
+      else
+      {
         std::cout << "not success\n";
       }
       graphs.emplace_back(graph1);
@@ -248,7 +259,8 @@ int main(int argc, char* argv[])
 
   plan_participant.set(planned_routes);
 
-  const auto& combined_graph = rmf_probabilistic_road_map::ProbabilisticRoadMap::combine_graphs(graphs);
+  const auto& combined_graph =
+    rmf_probabilistic_road_map::ProbabilisticRoadMap::combine_graphs(graphs);
   auto end_timing = std::chrono::steady_clock::now();
 
   std::cout << "-------------------------" << std::endl;
