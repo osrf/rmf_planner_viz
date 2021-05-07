@@ -46,7 +46,7 @@ struct ModelSpaceShape
 bool collide_seperable_shapes(
   fcl::SplineMotion<double>& motion_a,
   fcl::SplineMotion<double>& motion_b,
-  uint sweeps,
+  const std::vector<double>& sweeps,
   const std::vector<ModelSpaceShape>& a_shapes,
   const std::vector<ModelSpaceShape>& b_shapes,
   double& impact_time, uint& iterations, 
@@ -56,6 +56,9 @@ bool collide_seperable_shapes(
 uint get_sweep_divisions(const Eigen::Vector3d& a_x0, const Eigen::Vector3d& a_x1, 
   const Eigen::Vector3d& b_x0, const Eigen::Vector3d& b_x1);
 
+std::vector<double> get_ccd_sweep_markers(const Eigen::Vector3d& a_x0, const Eigen::Vector3d& a_x1, 
+  const Eigen::Vector3d& a_v0, const Eigen::Vector3d& a_v1);
+  
 fcl::SplineMotion<double> to_fcl(const std::array<Eigen::Vector3d, 4>& knots);
 
 // Presets
@@ -78,7 +81,8 @@ struct Preset
   Eigen::Vector3d b_start = Eigen::Vector3d(0,0,0);
   Eigen::Vector3d b_end = Eigen::Vector3d(0,0,0);
   
-  Eigen::Vector3d b_vel = Eigen::Vector3d(0,0,0);
+  Eigen::Vector3d b_vel_start = Eigen::Vector3d(0,0,0);
+  Eigen::Vector3d b_vel_end = Eigen::Vector3d(0,0,0);
 };
 
 std::vector<Preset> setup_presets();

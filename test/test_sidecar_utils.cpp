@@ -30,7 +30,7 @@
 #include <fcl/narrowphase/detail/primitive_shape_algorithm/sphere_box.h>
 #include <fcl/narrowphase/detail/primitive_shape_algorithm/box_box.h>
 
-//#define DO_LOGGING 1
+#define DO_LOGGING 1
 
 namespace rmf_planner_viz {
 namespace draw {
@@ -640,10 +640,12 @@ struct SeperationComputation
 
 #ifdef DO_LOGGING
       printf("a1 vs b2 %d, %d\n", initial_seperation_props.pointindices_b[0], initial_seperation_props.pointindices_b[1]);
+      printf("localpoint_a1: %f, %f\n", localpoint_a.x(), localpoint_a.y());
       printf("localpoint_b1: %f, %f\n", localpoint_b1.x(), localpoint_b1.y());
       printf("localpoint_b2: %f, %f\n", localpoint_b2.x(), localpoint_b2.y());
 
       printf("seperation_axis: %f, %f\n", seperation_axis.x(), seperation_axis.y());
+      printf("transformed_axis: %f, %f\n", transformed_axis.x(), transformed_axis.y());
       printf("point_b: %f, %f\n", point_b.x(), point_b.y());
 #endif
     }
@@ -1066,22 +1068,21 @@ inline bool collide_pairwise_shapes(
   
   double t = t_min;
   uint iter = 0;
-  while (dist_to_cover > 0.0 && t < t_max)
+  while (dist_to_cover > tolerance && t < t_max)
   {
 #ifdef DO_LOGGING
     printf("======= iter:%d\n", iter);
-    auto d = seperation_info.a_to_b;
-    std::cout << "a_to_b: \n" << d << std::endl;
     std::cout << "dist_to_cover: " << dist_to_cover << std::endl;
-    rmf_planner_viz::draw::IMDraw::draw_arrow(sf::Vector2f(0, 0), sf::Vector2f(d.x(), d.y()));
+    //rmf_planner_viz::draw::IMDraw::draw_arrow(sf::Vector2f(0, 0), sf::Vector2f(d.x(), d.y()));
 #endif
     auto collide_result = max_motion_advancement(t, t_max, motion_a, motion_b, shape_a, shape_b, 
       seperation_info,
       target_length, tolerance, dist_checks, t);
     if (collide_result == ADV_COLLIDE)
-      break;
-    else if (collide_result == ADV_SEPERATED)
-      return false;
+    {
+      impact_time = t;
+      return true;
+    }
 
 #ifdef DO_LOGGING
     printf("max_motion_advancement returns t: %f\n", t);
@@ -1098,16 +1099,19 @@ inline bool collide_pairwise_shapes(
 
     ++dist_checks;
     ++iter;
+
+    if (collide_result == ADV_SEPERATED)
+      break;
     
     //infinite loop prevention. you should increase safety_maximum_checks if you still want a solution
     if (dist_checks > safety_maximum_checks)
       break;
   }
   
-  if (dist_checks > safety_maximum_checks)
-    return false;
-
-  if (t >= t_min && t < t_max)
+#ifdef DO_LOGGING
+  printf("dist_to_cover: %f\n", dist_to_cover);
+#endif
+  if (dist_to_cover <= tolerance)
   {
     impact_time = t;
 #ifdef DO_LOGGING
@@ -1124,7 +1128,7 @@ inline bool collide_pairwise_shapes(
 bool collide_seperable_shapes(
   fcl::SplineMotion<double>& motion_a, 
   fcl::SplineMotion<double>& motion_b,
-  uint sweeps,
+  const std::vector<double>& sweeps,
   const std::vector<ModelSpaceShape>& shapes_a,
   const std::vector<ModelSpaceShape>& shapes_b,
   double& impact_time, uint& iterations, uint safety_maximum_iterations,
@@ -1135,11 +1139,13 @@ bool collide_seperable_shapes(
     for (const auto& shape_b : shapes_b)
     {
       uint iterations_this_pair = 0;
-      double t_per_sweep = 1.0 / (double)sweeps;
-      for (uint i=0; i<sweeps; ++i)
+      for (uint i=1; i<sweeps.size(); ++i)
       {
-        double t_min = t_per_sweep * (double)i;
-        double t_max = t_per_sweep * (double)(i + 1);
+        double t_min = sweeps[i - 1];
+        double t_max = sweeps[i];
+#ifdef DO_LOGGING
+        printf("sweep range:[%f, %f]", t_min, t_max);
+#endif
 
         double toi = 0.0;
         bool collide = collide_pairwise_shapes(
@@ -1155,7 +1161,7 @@ bool collide_seperable_shapes(
           return true;
         }
 
-      }      
+      }
     }
   }
   return false;
@@ -1165,18 +1171,121 @@ uint get_sweep_divisions(const Eigen::Vector3d& a_x0, const Eigen::Vector3d& a_x
   const Eigen::Vector3d& b_x0, const Eigen::Vector3d& b_x1)
 {
   //it's been noted in the bilateral advancement that rotations can miss collisions
-  //the only way to handle it is to introduces sweep ranges
+  //one way to handle it is to subdivide our ccd sweeps
 
-  //@todo: it would be good to support spline velocities, ie. spline curvatures
   double rot_diff_a = std::abs(a_x1.z() - a_x0.z());
   double rot_diff_b = std::abs(b_x1.z() - b_x0.z());
 
-  double half_pi = EIGEN_PI * 0.5;
+  double half_pi = EIGEN_PI * 0.25;
   uint a_intervals = (uint)std::ceil(rot_diff_a / half_pi);
   uint b_intervals = (uint)std::ceil(rot_diff_b / half_pi);
   if (a_intervals == 0 && b_intervals == 0)
     return 1;
+  
   return a_intervals > b_intervals ? a_intervals : b_intervals;
+}
+
+std::vector<double> get_ccd_sweep_markers(const Eigen::Vector3d& x0, const Eigen::Vector3d& x1, 
+  const Eigen::Vector3d& v0, const Eigen::Vector3d& v1)
+{
+  // this function introduces sweep markers to account for all the edge cases
+  // where the CCD algorithm will miss
+
+  std::vector<double> markers = { 0.0, 1.0 };
+
+  // for rotations more than 90 degrees : add in even intervals
+  double rot_diff = std::abs(x1.z() - x0.z());
+  double half_pi = EIGEN_PI * 0.25;
+  uint rotation_intervals = (uint)std::ceil(rot_diff / half_pi);
+
+  double t_per_interval = 1.0 / rotation_intervals;
+  for (uint i=1; i<rotation_intervals; ++i)
+  {
+    double t = (double)i * t_per_interval;
+    markers.emplace_back(t);
+  }
+
+  // split curved trajectories up based off derivatives x=0 or y=0
+  auto coeff = rmf_planner_viz::draw::compute_coefficients(x0, x1, v0, v1);
+  // compute coefficients of the derivative
+  std::array<Eigen::Vector3d, 3> derivative_coeff;
+  for (uint axis=0; axis<3; ++axis)
+  {
+    derivative_coeff[axis][0] = coeff[axis][1];
+    derivative_coeff[axis][1] = 2.0 * coeff[axis][2];
+    derivative_coeff[axis][2] = 3.0 * coeff[axis][3];
+  }
+
+  auto compute_roots_in_unit_domain = [](const Eigen::Vector3d coeffs)
+    -> std::vector<double> 
+  {
+    const double tol = 1e-5;
+
+    const double a = coeffs[2];
+    const double b = coeffs[1];
+    const double c = coeffs[0];
+
+    if (std::abs(a) < tol)
+    {
+      if (std::abs(b) < tol)
+      {
+        return {};
+      }
+
+      const double t = -c/b;
+      if (0.0 <= t && t <= 1.0)
+      {
+        return {t};
+      }
+
+      return {};
+    }
+
+    const double determinate = (b*b - 4*a*c);
+    if (determinate < 0.0)
+    {
+      return {};
+    }
+
+    std::vector<double> output;
+    const double t_m = (-b - std::sqrt(determinate))/(2*a);
+    if (0.0 <= t_m && t_m <= 1.0)
+      output.push_back(t_m);
+
+    const double t_p = (-b + std::sqrt(determinate))/(2*a);
+    double time_tolerance = 1e-4;
+    if (0.0 <= t_p && t_p <= 1.0 && std::abs(t_p - t_m) > time_tolerance)
+      output.push_back(t_p);
+
+    return output;
+  };
+
+  auto roots_y_eq_0 = compute_roots_in_unit_domain(derivative_coeff[0]);
+  auto roots_x_eq_0 = compute_roots_in_unit_domain(derivative_coeff[1]);
+
+  auto add_non_duplicates = [](std::vector<double>& roots, const std::vector<double>& newroots)
+  {
+    for (auto newroot : newroots)
+    {
+      bool skip = false;
+      for (auto root : roots)
+      {
+        if (abs(newroot - root) <= 0.01)
+        {
+          skip = true;
+          break;
+        }
+      }
+
+      if (!skip)
+        roots.push_back(newroot);
+    }
+  };
+  add_non_duplicates(markers, roots_y_eq_0);
+  add_non_duplicates(markers, roots_x_eq_0);
+
+  std::sort(markers.begin(), markers.end());
+  return markers;
 }
 
 fcl::SplineMotion<double> to_fcl(const std::array<Eigen::Vector3d, 4>& knots)
@@ -1256,14 +1365,14 @@ std::vector<Preset> setup_presets()
     fcl::Transform3<double> shape_a2_offset;
     shape_a2_offset.setIdentity();
     shape_a2_offset.pretranslate(Eigen::Vector3d(0, -1.0, 0));
-    //p.a_shapes.emplace_back(shape_a2_offset, std::make_shared<fcl::Sphered>(0.6));
-    p.a_shapes.emplace_back(shape_a2_offset, std::make_shared<fcl::Boxd>(1.5, 1.0, 0));
+    p.a_shapes.emplace_back(shape_a2_offset, std::make_shared<fcl::Sphered>(0.6));
+    //p.a_shapes.emplace_back(shape_a2_offset, std::make_shared<fcl::Boxd>(1.5, 1.0, 0));
     
     fcl::Transform3<double> shape_b2_offset;
     shape_b2_offset.setIdentity();
     shape_b2_offset.pretranslate(Eigen::Vector3d(0, -1.0, 0));
-    //p.b_shapes.emplace_back(shape_b2_offset, std::make_shared<fcl::Sphered>(0.6));
-    p.b_shapes.emplace_back(shape_a2_offset, std::make_shared<fcl::Boxd>(0.75, 1.0, 0));
+    p.b_shapes.emplace_back(shape_b2_offset, std::make_shared<fcl::Sphered>(0.6));
+    //p.b_shapes.emplace_back(shape_a2_offset, std::make_shared<fcl::Boxd>(0.75, 1.0, 0));
     
     p.a_end = Eigen::Vector3d(0, 0, -EIGEN_PI);
 
@@ -1369,7 +1478,7 @@ std::vector<Preset> setup_presets()
     shape_b2_offset.pretranslate(Eigen::Vector3d(1, 0, 0));
     p.b_shapes.emplace_back(shape_b2_offset, std::make_shared<fcl::Sphered>(0.6));
 
-    p.tolerance = 0.1;
+    //p.tolerance = 0.1;
     
     p.a_start = Eigen::Vector3d(0,0,0);
     p.a_end = Eigen::Vector3d(0,0,0);
@@ -1377,7 +1486,8 @@ std::vector<Preset> setup_presets()
     p.b_start = Eigen::Vector3d(-5, 0, 0);
     p.b_end = Eigen::Vector3d(-2, 0, 0);
 
-    p.b_vel = Eigen::Vector3d(0, 16, 0);
+    p.b_vel_start = Eigen::Vector3d(0, 16, 0);
+    p.b_vel_end = Eigen::Vector3d(0, -16, 0);
 
     presets.push_back(p);
   }
@@ -1389,13 +1499,13 @@ std::vector<Preset> setup_presets()
 
     //p.a_shapes.emplace_back(identity, std::make_shared<fcl::Sphered>(0.5));
     //p.b_shapes.emplace_back(identity, std::make_shared<fcl::Sphered>(0.5));
-    p.a_shapes.emplace_back(identity, std::make_shared<fcl::Boxd>(0.75, 0.5, 0));
+    p.a_shapes.emplace_back(identity, std::make_shared<fcl::Boxd>(1, 1, 0));
     p.b_shapes.emplace_back(identity, std::make_shared<fcl::Boxd>(0.5, 0.5, 0));
     
     fcl::Transform3<double> shape_b2_offset;
     shape_b2_offset.setIdentity();
     shape_b2_offset.pretranslate(Eigen::Vector3d(0, -1.0, 0));
-    p.b_shapes.emplace_back(shape_b2_offset, std::make_shared<fcl::Sphered>(0.6));
+    //p.b_shapes.emplace_back(shape_b2_offset, std::make_shared<fcl::Sphered>(0.6));
 
     p.tolerance = 0.1;
     
@@ -1403,9 +1513,40 @@ std::vector<Preset> setup_presets()
     p.a_end = Eigen::Vector3d(0,0,0);
 
     p.b_start = Eigen::Vector3d(-5, 0, 0);
-    p.b_end = Eigen::Vector3d(-1.5, 0, EIGEN_PI / 2.0);
+    //p.b_end = Eigen::Vector3d(-1.5, 0, EIGEN_PI / 2.0);
+    p.b_end = Eigen::Vector3d(0.625, 0.422, EIGEN_PI / 2.0);
 
-    p.b_vel = Eigen::Vector3d(0, 16, 0);
+    p.b_vel_start = Eigen::Vector3d(0, 16, 0);
+    p.b_vel_end = Eigen::Vector3d(0, -16, 0);
+    presets.push_back(p);
+  }
+
+  {
+    Preset p;
+    p._description = "Wonky vs Stationary";
+    p._type = PRESET_SPLINEMOTION;
+
+    //p.a_shapes.emplace_back(identity, std::make_shared<fcl::Sphered>(0.5));
+    p.b_shapes.emplace_back(identity, std::make_shared<fcl::Sphered>(0.5));
+    p.a_shapes.emplace_back(identity, std::make_shared<fcl::Boxd>(0.75, 0.5, 0));
+    //p.b_shapes.emplace_back(identity, std::make_shared<fcl::Boxd>(0.5, 0.5, 0));
+    
+    fcl::Transform3<double> shape_b2_offset;
+    shape_b2_offset.setIdentity();
+    shape_b2_offset.pretranslate(Eigen::Vector3d(0, -1.0, 0));
+    //p.b_shapes.emplace_back(shape_b2_offset, std::make_shared<fcl::Sphered>(0.6));
+    //p.b_shapes.emplace_back(shape_b2_offset, std::make_shared<fcl::Boxd>(0.75, 0.5, 0));
+
+    p.tolerance = 0.1;
+    
+    p.a_start = Eigen::Vector3d(0,0,0);
+    p.a_end = Eigen::Vector3d(0,0,0);
+
+    p.b_start = Eigen::Vector3d(-5, 0, 0);
+    p.b_end = Eigen::Vector3d(-1.5, 0, 0);
+
+    p.b_vel_start = Eigen::Vector3d(40, 16, 0);
+    p.b_vel_end = Eigen::Vector3d(0, 16, 0);
     presets.push_back(p);
   }
 

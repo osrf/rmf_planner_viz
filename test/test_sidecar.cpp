@@ -271,7 +271,7 @@ int main()
       static std::vector<ModelSpaceShape> b_shapes;
       PRESET_TYPE preset_type = PRESET_SPLINEMOTION;
       static int current_preset = 0;
-      static uint sweeps = 1;
+      static std::vector<double> sweep_markers;
 
       std::string preview_val = std::to_string(current_preset);
       if (current_preset != -1 && current_preset < (int)presets.size())
@@ -321,17 +321,40 @@ int main()
             b_end.y() = b_end_pos.y();
           }
 
-          Eigen::Vector3d b_vel = preset.b_vel;
+          Eigen::Vector3d b_vel_start = preset.b_vel_start;
+          Eigen::Vector3d b_vel_end = preset.b_vel_end;
           Eigen::Vector3d zero(0,0,0);
 
           tolerance = preset.tolerance;
-          sweeps = get_sweep_divisions(a_start, a_end, b_start, b_end);
+          auto sweep_markers_a = get_ccd_sweep_markers(a_start, a_end, zero, zero);
+          auto sweep_markers_b = get_ccd_sweep_markers(b_start, b_end, b_vel_start, b_vel_end);
+
+          auto add_non_duplicates = [](std::vector<double>& roots, const std::vector<double>& newroots)
+          {
+            for (auto newroot : newroots)
+            {
+              bool skip = false;
+              for (auto root : roots)
+              {
+                if (abs(newroot - root) <= 0.01)
+                {
+                  skip = true;
+                  break;
+                }
+              }
+
+              if (!skip)
+                roots.push_back(newroot);
+            }
+          };
+          sweep_markers = sweep_markers_a;
+          add_non_duplicates(sweep_markers, sweep_markers_b);
+          std::sort(sweep_markers.begin(), sweep_markers.end());
 
           auto knots_a =
             rmf_planner_viz::draw::compute_knots(a_start, a_end, zero, zero);
           auto knots_b =
-            rmf_planner_viz::draw::compute_knots(b_start, b_end, b_vel, -b_vel);
-          //b_end.z() - b_start.z();
+            rmf_planner_viz::draw::compute_knots(b_start, b_end, b_vel_start, b_vel_end);
 
           motion_a = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_a));
           motion_b = std::make_shared<fcl::SplineMotion<double>>(to_fcl(knots_b));
@@ -340,7 +363,18 @@ int main()
         }
         preset_changed = false;
       }
-    
+      
+      {
+        static float v1[2];
+        v1[0] = b_start_pos.x();
+        v1[1] = b_start_pos.y();
+        ImGui::InputFloat2("b_start", v1);
+        static float v2[2];
+        v2[0] = b_end_pos.x();
+        v2[1] = b_end_pos.y();
+        ImGui::InputFloat2("b_end", v2);
+      }
+      
       ImGui::Separator();
       ImGui::Text("Preset: %d", current_preset);
       ImGui::Separator();
@@ -352,7 +386,14 @@ int main()
       if (tolerance_override)
         tolerance = (double)tol;
       ImGui::Text("Tolerance: %f", tolerance);
-      ImGui::Text("Sweeps: %d", sweeps);
+      
+      std::string marker_values;
+      for (auto marker : sweep_markers)
+      {
+        marker_values += std::to_string(marker);
+        marker_values += ",";
+      }
+      ImGui::Text("Sweeps: [%s]", marker_values.c_str());
       ImGui::Separator();
 
       static bool draw_toi_shapes = true;
@@ -413,7 +454,7 @@ int main()
         bool collide = collide_seperable_shapes(
           *(fcl::SplineMotion<double>*)motion_a.get(),
           *(fcl::SplineMotion<double>*)motion_b.get(),
-          sweeps, a_shapes, b_shapes,
+          sweep_markers, a_shapes, b_shapes,
           toi, iterations, 120, (double)tolerance);
 
         auto end = get_end_time();

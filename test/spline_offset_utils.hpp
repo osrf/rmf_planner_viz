@@ -30,6 +30,10 @@ namespace rmf_planner_viz {
 namespace draw {
 
 // Lifted functions from so they do not affect the public api. Double check that they sync up
+std::array<Eigen::Vector4d, 3> compute_coefficients(const Eigen::Vector3d& x0,
+                                                    const Eigen::Vector3d& x1,
+                                                    const Eigen::Vector3d& v0,
+                                                    const Eigen::Vector3d& v1);
 
 std::array<Eigen::Vector3d, 4> compute_knots(
   Eigen::Vector3d x0,
