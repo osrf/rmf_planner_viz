@@ -127,27 +127,6 @@ target_include_directories(
     rmf_freespace_planner::rmf_freespace_planner
 )
 
-add_executable(test_probabilistic_road_map
-  test/test_probabilistic_road_map.cpp
-  test/planner_debug.cpp
-)
-target_link_libraries(
-  test_probabilistic_road_map
-  PUBLIC
-    rmf_planning_viz
-    ImGui-SFML::ImGui-SFML
-    rmf_fleet_adapter::rmf_fleet_adapter
-    rmf_performance_tests::rmf_performance_tests
-    rmf_probabilistic_road_map::rmf_probabilistic_road_map
-)
-target_include_directories(
-  test_probabilistic_road_map
-  PUBLIC
-    rmf_fleet_adapter::rmf_fleet_adapter
-    rmf_performance_tests::rmf_performance_tests
-    rmf_probabilistic_road_map::rmf_probabilistic_road_map
-)
-
 add_executable(test_trajectory_probabilistic_road_map
   test/test_trajectory_probabilistic_road_map.cpp
 )

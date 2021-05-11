@@ -133,7 +133,8 @@ int main(int argc, char* argv[])
     }
   }
 
-  std::vector<std::pair<Eigen::Vector2d, double>> static_obstacles;
+  std::vector<rmf_probabilistic_road_map::ProbabilisticRoadMap::Obstacle>
+  static_obstacles;
   for (const auto& obstacle : scenario.obstacle_routes)
   {
     const auto& robot = scenario.robots.at(obstacle.robot);
@@ -144,9 +145,9 @@ int main(int argc, char* argv[])
         robot.vehicle_traits().profile(),
         obstacle.route));
 
-    static_obstacles.emplace_back(obstacle.route.trajectory().at(
-        0).position().head<2>(),
-      robot.vehicle_traits().profile().footprint()->get_characteristic_length());
+    static_obstacles.push_back(
+      {obstacle.route.trajectory().at(0).position().head<2>(),
+        robot.vehicle_traits().profile().footprint()->get_characteristic_length()});
   }
 
   const auto& plan = scenario.plan;
@@ -191,9 +192,6 @@ int main(int argc, char* argv[])
 
   const auto& start_timing = std::chrono::steady_clock::now();
   std::vector<rmf_traffic::Route> planned_routes;
-  std::vector<rmf_traffic::agv::Graph> graphs;
-  rmf_traffic::agv::Planner::Options options(obstacle_validator);
-  options.saturation_limit(5000);
   for (const auto& route : routes)
   {
     for (std::size_t i = 0; i < route.trajectory().size() - 1; ++i)
@@ -214,53 +212,22 @@ int main(int argc, char* argv[])
       rmf_probabilistic_road_map::ProbabilisticRoadMap probabilistic_road_map(
         3,
         1000.0,
-        plan_robot->second.vehicle_traits().profile().footprint()->get_characteristic_length(),
         database,
         std::unordered_set<rmf_traffic::schedule::ParticipantId>(
-          {plan_participant.id()}),
-        routes.at(0).map());
-      probabilistic_road_map.set_obstacles(static_obstacles);
+          {plan_participant.id()}));
 
-      auto graph1 = probabilistic_road_map.create_graph(
-        route.trajectory()[i], route.trajectory()[i + 1]);
-      rmf_traffic::agv::Planner planner_1(
-        {graph1, plan_robot->second.vehicle_traits()},
-        options);
-      starts =
-      {{route.trajectory()[i].time(), 0,
-        route.trajectory()[i].position().z()}};
-      goal = graph1.num_waypoints() - 1;
-
-      auto result = planner_1.plan(starts, goal);
-      std::size_t index = 0;
-
-      while (!result.success())
-      {
-        graph1 =
-          probabilistic_road_map.expand_graph(graph1,
-            route.trajectory()[i], route.trajectory()[i + 1], 3);
-        rmf_traffic::agv::Planner planner_2(
-          {graph1, plan_robot->second.vehicle_traits()},
-          options);
-        result = planner_2.plan(starts, goal);
-      }
-      if (result.success())
-      {
-        planned_routes.insert(planned_routes.end(),
-          result->get_itinerary().begin(), result->get_itinerary().end());
-      }
-      else
-      {
-        std::cout << "not success\n";
-      }
-      graphs.emplace_back(graph1);
+      auto result = probabilistic_road_map.plan(
+        {route.trajectory()[i].position(), route.trajectory()[i].time()},
+        {route.trajectory()[i + 1].position()},
+        plan_robot->second.vehicle_traits(),
+        static_obstacles,
+        route.map());
+      planned_routes.insert(planned_routes.end(), result.begin(), result.end());
     }
   }
 
   plan_participant.set(planned_routes);
 
-  const auto& combined_graph =
-    rmf_probabilistic_road_map::ProbabilisticRoadMap::combine_graphs(graphs);
   auto end_timing = std::chrono::steady_clock::now();
 
   std::cout << "-------------------------" << std::endl;
@@ -269,11 +236,12 @@ int main(int argc, char* argv[])
       end_timing - start_timing).count() / 1000.0 << "s" << std::endl;
   std::cout << "-------------------------" << std::endl;
 
-  rmf_planner_viz::draw::Graph graph_0_drawable(combined_graph, 0.5, font);
+  rmf_planner_viz::draw::Graph graph_0_drawable(
+    plan_robot->second.graph(), 0.5, font);
   std::vector<std::string> map_names = graph_0_drawable.get_map_names();
   std::string chosen_map = argv[2];
-  if (graph_0_drawable.current_map())
-    chosen_map = *graph_0_drawable.current_map();
+//  if (graph_0_drawable.current_map())
+//    chosen_map = *graph_0_drawable.current_map();
 
   rmf_planner_viz::draw::Schedule schedule_drawable(
     database, 0.25, chosen_map, start_time + 0s);
