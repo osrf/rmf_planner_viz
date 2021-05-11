@@ -210,7 +210,35 @@ int main(int argc, char* argv[])
   std::cout << "-------------------------" << std::endl;
 
   start_timing = std::chrono::steady_clock::now();
-  plan_participant.set(posq->make_plan(planner_routes));
+
+  std::vector<rmf_traffic::Route> freespace_routes;
+  for (const auto& route : planner_routes)
+  {
+    for (std::size_t i = 0; i < route.trajectory().size() - 1; ++i)
+    {
+      if ((route.trajectory()[i].position() -
+          route.trajectory()[i + 1].position()).norm() < 1)
+      {
+        continue;
+      }
+      if (route.trajectory()[i].position().x() ==
+          route.trajectory()[i + 1].position().x() &&
+          route.trajectory()[i].position().y() ==
+              route.trajectory()[i + 1].position().y())
+      {
+        continue;
+      }
+      auto freespace_route =
+        posq->plan(
+          {route.trajectory()[i].position(), route.trajectory()[i].time()},
+          {route.trajectory()[i + 1].position()},
+          traits,
+          route.map());
+      freespace_routes.insert(freespace_routes.end(), freespace_route.begin(), freespace_route.end());
+    }
+  }
+  plan_participant.set(freespace_routes);
+
   end_timing = std::chrono::steady_clock::now();
   std::cout << "-------------------------" << std::endl;
   std::cout << "Time taken for make_plan " <<
