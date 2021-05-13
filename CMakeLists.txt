@@ -137,14 +137,14 @@ target_link_libraries(
     ImGui-SFML::ImGui-SFML
     rmf_fleet_adapter::rmf_fleet_adapter
     rmf_performance_tests::rmf_performance_tests
-    rmf_probabilistic_road_map::rmf_probabilistic_road_map
+    rmf_freespace_planner::rmf_freespace_planner
 )
 target_include_directories(
   test_trajectory_probabilistic_road_map
   PUBLIC
     rmf_fleet_adapter::rmf_fleet_adapter
     rmf_performance_tests::rmf_performance_tests
-    rmf_probabilistic_road_map::rmf_probabilistic_road_map
+    rmf_freespace_planner::rmf_freespace_planner
 )
 
 add_executable(test_spline

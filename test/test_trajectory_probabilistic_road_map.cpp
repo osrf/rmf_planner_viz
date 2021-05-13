@@ -21,9 +21,9 @@
 #include <rmf_planner_viz/draw/Schedule.hpp>
 
 #include <rmf_fleet_adapter/agv/parse_graph.hpp>
+#include <rmf_freespace_planner/rmf_probabilistic_road_map.hpp>
 #include <rmf_performance_tests/rmf_performance_tests.hpp>
 #include <rmf_performance_tests/Scenario.hpp>
-#include <rmf_probabilistic_road_map/rmf_probabilistic_road_map.hpp>
 #include <rmf_traffic/schedule/Database.hpp>
 
 #include <Eigen/Geometry>
@@ -133,7 +133,7 @@ int main(int argc, char* argv[])
     }
   }
 
-  std::vector<rmf_probabilistic_road_map::ProbabilisticRoadMap::Obstacle>
+  std::vector<rmf_freespace_planner::rmf_probabilistic_road_map::ProbabilisticRoadMap::Obstacle>
   static_obstacles;
   for (const auto& obstacle : scenario.obstacle_routes)
   {
@@ -209,7 +209,9 @@ int main(int argc, char* argv[])
         continue;
       }
 
-      rmf_probabilistic_road_map::ProbabilisticRoadMap probabilistic_road_map(
+      rmf_freespace_planner::rmf_probabilistic_road_map::ProbabilisticRoadMap
+        probabilistic_road_map(
+        obstacle_validator,
         3,
         1000.0,
         database,
