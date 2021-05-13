@@ -233,6 +233,7 @@ int main(int argc, char* argv[])
           {route.trajectory()[i].position(), route.trajectory()[i].time()},
           {route.trajectory()[i + 1].position()},
           traits,
+          std::nullopt,
           route.map());
       freespace_routes.insert(freespace_routes.end(), freespace_route.begin(), freespace_route.end());
     }
