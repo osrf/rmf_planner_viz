@@ -15,7 +15,9 @@ find_package(rmf_fleet_adapter REQUIRED)
 find_package(rmf_traffic REQUIRED)
 find_package(SFML COMPONENTS graphics window system REQUIRED)
 find_package(ImGui-SFML)
-
+find_package(rmf_performance_tests)
+find_package(rmf_freespace_planner)
+find_package(rmf_probabilistic_road_map)
 
 include(GNUInstallDirs)
 
@@ -60,12 +62,89 @@ target_include_directories(
     rmf_fleet_adapter::rmf_fleet_adapter
 )
 
+if (rmf_performance_tests_FOUND)
+  add_executable(performance_test
+    test/performance_test.cpp
+    test/planner_debug.cpp
+  )
+
+  target_link_libraries(
+    performance_test
+    PUBLIC
+      rmf_planning_viz
+      rmf_fleet_adapter::rmf_fleet_adapter
+      ImGui-SFML::ImGui-SFML
+      rmf_performance_tests::rmf_performance_tests
+  )
+
+  target_include_directories(
+    performance_test
+    PUBLIC
+      rmf_fleet_adapter::rmf_fleet_adapter
+      rmf_performance_tests::rmf_performance_tests
+  )
+endif()
+
 add_executable(test_trajectory test/test_trajectory.cpp)
 target_link_libraries(
   test_trajectory
   PUBLIC
     rmf_planning_viz
     ImGui-SFML::ImGui-SFML
+)
+
+add_executable(performance_test_trajectory test/performance_test_trajectory.cpp)
+target_link_libraries(
+  performance_test_trajectory
+  PUBLIC
+    rmf_planning_viz
+    ImGui-SFML::ImGui-SFML
+    rmf_fleet_adapter::rmf_fleet_adapter
+    rmf_performance_tests::rmf_performance_tests
+)
+target_include_directories(
+  performance_test_trajectory
+  PUBLIC
+    rmf_fleet_adapter::rmf_fleet_adapter
+    rmf_performance_tests::rmf_performance_tests
+)
+
+add_executable(test_freespace_planner test/test_freespace_planner.cpp)
+target_link_libraries(
+  test_freespace_planner
+  PUBLIC
+    rmf_planning_viz
+    ImGui-SFML::ImGui-SFML
+    rmf_fleet_adapter::rmf_fleet_adapter
+    rmf_performance_tests::rmf_performance_tests
+    rmf_freespace_planner::rmf_freespace_planner
+)
+target_include_directories(
+  test_freespace_planner
+  PUBLIC
+    rmf_fleet_adapter::rmf_fleet_adapter
+    rmf_performance_tests::rmf_performance_tests
+    rmf_freespace_planner::rmf_freespace_planner
+)
+
+add_executable(test_trajectory_probabilistic_road_map
+  test/test_trajectory_probabilistic_road_map.cpp
+)
+target_link_libraries(
+  test_trajectory_probabilistic_road_map
+  PUBLIC
+    rmf_planning_viz
+    ImGui-SFML::ImGui-SFML
+    rmf_fleet_adapter::rmf_fleet_adapter
+    rmf_performance_tests::rmf_performance_tests
+    rmf_freespace_planner::rmf_freespace_planner
+)
+target_include_directories(
+  test_trajectory_probabilistic_road_map
+  PUBLIC
+    rmf_fleet_adapter::rmf_fleet_adapter
+    rmf_performance_tests::rmf_performance_tests
+    rmf_freespace_planner::rmf_freespace_planner
 )
 
 add_executable(test_spline
@@ -139,4 +218,3 @@ install(
   DIRECTORY fonts/
   DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/fonts/
 )
-
